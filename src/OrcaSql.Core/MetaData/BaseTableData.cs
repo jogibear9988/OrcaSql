@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OrcaSql.Core.Engine;
@@ -162,7 +163,10 @@ namespace OrcaSql.Core.MetaData
 			        .pgfirst
 			);
 
-			SysRowsets = _scanner.ScanLinkedDataPages<sysrowset>(pageLoc, CompressionContext.NoCompression).ToList();
+			var pp = new PagePointer(1, 1951);
+            var a = _scanner.ScanLinkedDataPages<sysrowset>(pp, CompressionContext.NoCompression);
+			var qqq = SysAllocUnits.Where(x => x.auid == 0x0001000000220000).ToList();
+            SysRowsets = _scanner.ScanLinkedDataPages<sysrowset>(pageLoc, CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSysallocunits()

@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Data.SqlClient;
 using System.Linq;
+using Microsoft.Data.SqlClient;
 using OrcaSql.Core.Engine;
 
 namespace OrcaSql.Scripting

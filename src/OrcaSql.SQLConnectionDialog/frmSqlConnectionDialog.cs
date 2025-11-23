@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using System.Data.SqlClient;
 using System.Linq;
 using Microsoft.Data.ConnectionUI;
+using Microsoft.Data.SqlClient;
 
 namespace SQLConnectionDialog
 {

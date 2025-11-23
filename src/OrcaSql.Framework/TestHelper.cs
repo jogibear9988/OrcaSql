@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Runtime.Remoting.Metadata.W3cXsd2001;
 using System.Text.RegularExpressions;
 
 namespace OrcaSql.Framework
@@ -23,7 +22,11 @@ namespace OrcaSql.Framework
 			if(input.Length % 2 != 0)
 				throw new FormatException("input");
 
-			return SoapHexBinary.Parse(input).Value;
+#if NET8_0_OR_GREATER
+			return Convert.FromHexString(input);
+#else
+			return System.Runtime.Remoting.Metadata.W3cXsd2001.SoapHexBinary.Parse(input).Value;
+#endif
 		}
 	}
 }

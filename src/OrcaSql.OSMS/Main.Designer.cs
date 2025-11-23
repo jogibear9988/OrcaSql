@@ -46,27 +46,27 @@ namespace OrcaSql.OSMS
             this.txtCode = new ICSharpCode.TextEditor.TextEditorControl();
             this.gridStatus = new System.Windows.Forms.StatusStrip();
             this.gridStatusRows = new System.Windows.Forms.ToolStripStatusLabel();
-            this.tableMenu = new System.Windows.Forms.ContextMenu();
-            this.showTableTopNRowsMenuItem = new System.Windows.Forms.MenuItem();
-            this.exportDataMenuItem = new System.Windows.Forms.MenuItem();
-            this.dmvMenu = new System.Windows.Forms.ContextMenu();
-            this.showDmvRowsMenuItem = new System.Windows.Forms.MenuItem();
-            this.baseTableMenu = new System.Windows.Forms.ContextMenu();
-            this.baseTableSelectAllRowsMenuItem = new System.Windows.Forms.MenuItem();
-            this.procedureMenu = new System.Windows.Forms.ContextMenu();
-            this.showProcedureCodeMenuItem = new System.Windows.Forms.MenuItem();
-            this.viewMenu = new System.Windows.Forms.ContextMenu();
-            this.showViewCodeMenuItem = new System.Windows.Forms.MenuItem();
-            this.functionMenu = new System.Windows.Forms.ContextMenu();
-            this.showFunctionCodeMenuItem = new System.Windows.Forms.MenuItem();
-            this.tableFunctionMenu = new System.Windows.Forms.ContextMenu();
-            this.showTableFunctionCodeMenuItem = new System.Windows.Forms.MenuItem();
-            this.tableTypeMenu = new System.Windows.Forms.ContextMenu();
-            this.showTableTypeCodeMenuItem = new System.Windows.Forms.MenuItem();
-            this.dataTypeMenu = new System.Windows.Forms.ContextMenu();
-            this.showDataTypeCodeMenuItem = new System.Windows.Forms.MenuItem();
-            this.databaseMenu = new System.Windows.Forms.ContextMenu();
-            this.generateRestorePageScriptMenuItem = new System.Windows.Forms.MenuItem();
+            this.tableMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showTableTopNRowsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.exportDataMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.dmvMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showDmvRowsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.baseTableMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.baseTableSelectAllRowsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.procedureMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showProcedureCodeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.viewMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showViewCodeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.functionMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showFunctionCodeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.tableFunctionMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showTableFunctionCodeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.tableTypeMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showTableTypeCodeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.dataTypeMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.showDataTypeCodeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.databaseMenu = new System.Windows.Forms.ContextMenuStrip();
+            this.generateRestorePageScriptMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.panel1.SuspendLayout();
             this.panel2.SuspendLayout();
@@ -217,118 +217,107 @@ namespace OrcaSql.OSMS
             // 
             // tableMenu
             // 
-            this.tableMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.tableMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showTableTopNRowsMenuItem,
             this.exportDataMenuItem});
             // 
             // showTableTopNRowsMenuItem
             // 
-            this.showTableTopNRowsMenuItem.Index = 0;
             this.showTableTopNRowsMenuItem.Text = "Select Top 1000 Rows";
             this.showTableTopNRowsMenuItem.Click += new System.EventHandler(this.ShowTableTopNRowsMenuItem_Click);
             // 
             // exportDataMenuItem
             // 
-            this.exportDataMenuItem.Index = 1;
             this.exportDataMenuItem.Text = "Export Data";
             this.exportDataMenuItem.Click += new System.EventHandler(this.ExportDataMenuItem_Click);
             // 
             // dmvMenu
             // 
-            this.dmvMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.dmvMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showDmvRowsMenuItem});
             // 
             // showDmvRowsMenuItem
             // 
-            this.showDmvRowsMenuItem.Index = 0;
             this.showDmvRowsMenuItem.Text = "Select All Rows";
             this.showDmvRowsMenuItem.Click += new System.EventHandler(this.ShowDmvRowsMenuItem_Click);
             // 
             // baseTableMenu
             // 
-            this.baseTableMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.baseTableMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.baseTableSelectAllRowsMenuItem});
             // 
             // baseTableSelectAllRowsMenuItem
             // 
-            this.baseTableSelectAllRowsMenuItem.Index = 0;
             this.baseTableSelectAllRowsMenuItem.Text = "Select All Rows";
             this.baseTableSelectAllRowsMenuItem.Click += new System.EventHandler(this.BaseTableSelectAllRowsMenuItem_Click);
             // 
             // procedureMenu
             // 
-            this.procedureMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.procedureMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showProcedureCodeMenuItem});
             // 
             // showProcedureCodeMenuItem
             // 
-            this.showProcedureCodeMenuItem.Index = 0;
             this.showProcedureCodeMenuItem.Text = "View Code";
             this.showProcedureCodeMenuItem.Click += new System.EventHandler(this.ShowProcedureCodeMenuItem_Click);
             // 
             // viewMenu
             // 
-            this.viewMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.viewMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showViewCodeMenuItem});
             // 
             // showViewCodeMenuItem
             // 
-            this.showViewCodeMenuItem.Index = 0;
             this.showViewCodeMenuItem.Text = "View Code";
             this.showViewCodeMenuItem.Click += new System.EventHandler(this.ShowViewCodeMenuItem_Click);
             // 
             // functionMenu
             // 
-            this.functionMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.functionMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showFunctionCodeMenuItem});
             // 
             // showFunctionCodeMenuItem
             // 
-            this.showFunctionCodeMenuItem.Index = 0;
             this.showFunctionCodeMenuItem.Text = "View Code";
             this.showFunctionCodeMenuItem.Click += new System.EventHandler(this.ShowFunctionCodeMenuItem_Click);
             // 
             // tableFunctionMenu
             // 
-            this.tableFunctionMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.tableFunctionMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showTableFunctionCodeMenuItem});
             // 
             // showTableFunctionCodeMenuItem
             // 
-            this.showTableFunctionCodeMenuItem.Index = 0;
             this.showTableFunctionCodeMenuItem.Text = "View Code";
             this.showTableFunctionCodeMenuItem.Click += new System.EventHandler(this.ShowTableFunctionCodeMenuItem_Click);
             // 
             // tableTypeMenu
             // 
-            this.tableTypeMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.tableTypeMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showTableTypeCodeMenuItem});
             // 
             // showTableTypeCodeMenuItem
             // 
-            this.showTableTypeCodeMenuItem.Index = 0;
             this.showTableTypeCodeMenuItem.Text = "View Code";
             this.showTableTypeCodeMenuItem.Click += new System.EventHandler(this.ShowTableTypeCodeMenuItem_Click);
             // 
             // dataTypeMenu
             // 
-            this.dataTypeMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.dataTypeMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.showDataTypeCodeMenuItem});
             // 
             // showDataTypeCodeMenuItem
             // 
-            this.showDataTypeCodeMenuItem.Index = 0;
             this.showDataTypeCodeMenuItem.Text = "View Code";
             this.showDataTypeCodeMenuItem.Click += new System.EventHandler(this.ShowDataTypeCodeMenuItem_Click);
             // 
             // databaseMenu
             // 
-            this.databaseMenu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
+            this.databaseMenu.Items.AddRange(new System.Windows.Forms.ToolStripMenuItem[] {
             this.generateRestorePageScriptMenuItem});
             // 
             // generateRestorePageScriptMenuItem
             // 
-            this.generateRestorePageScriptMenuItem.Index = 0;
             this.generateRestorePageScriptMenuItem.Text = "Generate Restore Page script";
             this.generateRestorePageScriptMenuItem.Click += new System.EventHandler(this.GenerateRestorePageScriptMenuItem_Click);
             // 
@@ -371,32 +360,32 @@ namespace OrcaSql.OSMS
 		private System.Windows.Forms.Splitter splitter1;
 		private System.Windows.Forms.Panel panel2;
 		private System.Windows.Forms.TreeView treeview;
-		private System.Windows.Forms.ContextMenu tableMenu;
-		private System.Windows.Forms.MenuItem showTableTopNRowsMenuItem;
-		private System.Windows.Forms.ContextMenu dmvMenu;
-		private System.Windows.Forms.MenuItem showDmvRowsMenuItem;
-		private System.Windows.Forms.ContextMenu baseTableMenu;
-		private System.Windows.Forms.MenuItem baseTableSelectAllRowsMenuItem;
+		private System.Windows.Forms.ContextMenuStrip tableMenu;
+		private System.Windows.Forms.ToolStripMenuItem showTableTopNRowsMenuItem;
+		private System.Windows.Forms.ContextMenuStrip dmvMenu;
+		private System.Windows.Forms.ToolStripMenuItem showDmvRowsMenuItem;
+		private System.Windows.Forms.ContextMenuStrip baseTableMenu;
+		private System.Windows.Forms.ToolStripMenuItem baseTableSelectAllRowsMenuItem;
 		private System.Windows.Forms.StatusStrip gridStatus;
 		private System.Windows.Forms.ToolStripStatusLabel gridStatusRows;
-		private System.Windows.Forms.ContextMenu procedureMenu;
-		private System.Windows.Forms.MenuItem showProcedureCodeMenuItem;
-		private System.Windows.Forms.ContextMenu viewMenu;
-		private System.Windows.Forms.MenuItem showViewCodeMenuItem;
-        private System.Windows.Forms.MenuItem exportDataMenuItem;
-        private System.Windows.Forms.ContextMenu functionMenu;
-        private System.Windows.Forms.MenuItem showFunctionCodeMenuItem;
-        private System.Windows.Forms.ContextMenu tableFunctionMenu;
-        private System.Windows.Forms.MenuItem showTableFunctionCodeMenuItem;
-        private System.Windows.Forms.ContextMenu tableTypeMenu;
-        private System.Windows.Forms.MenuItem showTableTypeCodeMenuItem;
-        private System.Windows.Forms.ContextMenu dataTypeMenu;
-        private System.Windows.Forms.MenuItem showDataTypeCodeMenuItem;
+		private System.Windows.Forms.ContextMenuStrip procedureMenu;
+		private System.Windows.Forms.ToolStripMenuItem showProcedureCodeMenuItem;
+		private System.Windows.Forms.ContextMenuStrip viewMenu;
+		private System.Windows.Forms.ToolStripMenuItem showViewCodeMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem exportDataMenuItem;
+        private System.Windows.Forms.ContextMenuStrip functionMenu;
+        private System.Windows.Forms.ToolStripMenuItem showFunctionCodeMenuItem;
+        private System.Windows.Forms.ContextMenuStrip tableFunctionMenu;
+        private System.Windows.Forms.ToolStripMenuItem showTableFunctionCodeMenuItem;
+        private System.Windows.Forms.ContextMenuStrip tableTypeMenu;
+        private System.Windows.Forms.ToolStripMenuItem showTableTypeCodeMenuItem;
+        private System.Windows.Forms.ContextMenuStrip dataTypeMenu;
+        private System.Windows.Forms.ToolStripMenuItem showDataTypeCodeMenuItem;
         private System.Windows.Forms.Panel panel3;
         private DataGridViewDoubleBuffered grid;
         private TextEditorControl txtCode;
-        private System.Windows.Forms.ContextMenu databaseMenu;
-        private System.Windows.Forms.MenuItem generateRestorePageScriptMenuItem;
+        private System.Windows.Forms.ContextMenuStrip databaseMenu;
+        private System.Windows.Forms.ToolStripMenuItem generateRestorePageScriptMenuItem;
     }
 }
 

@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Configuration;
 using System.Data;
-using System.Data.SqlClient;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.Data.SqlClient;
 using OrcaSql.Core.Engine;
 using OrcaSql.Core.MetaData;
 using OrcaSql.Core.MetaData.DMVs;
@@ -130,7 +130,7 @@ namespace OrcaSql.OSMS
 
         private void RefreshTreeView()
 		{
-            var rootNode = new TreeNode(Database.Name) {ContextMenu = databaseMenu};
+            var rootNode = new TreeNode(Database.Name) {ContextMenuStrip = databaseMenu};
 
 
             // Add base tables
@@ -268,7 +268,7 @@ namespace OrcaSql.OSMS
             foreach (var function in functions)
             {
                 var functionNode = scalarNode.Nodes.Add(function.Name);
-                functionNode.ContextMenu = functionMenu;
+                functionNode.ContextMenuStrip = functionMenu;
             }
         }
 
@@ -287,7 +287,7 @@ namespace OrcaSql.OSMS
             foreach (var function in functions)
             {
                 var functionNode = tableNode.Nodes.Add(function.Name);
-                functionNode.ContextMenu = tableFunctionMenu;
+                functionNode.ContextMenuStrip = tableFunctionMenu;
             }
         }
 
@@ -306,7 +306,7 @@ namespace OrcaSql.OSMS
             foreach (var view in views)
 			{
 				var viewNode = viewsNode.Nodes.Add(view.Name);
-				viewNode.ContextMenu = viewMenu;
+				viewNode.ContextMenuStrip = viewMenu;
 			}
 		}
 
@@ -325,7 +325,7 @@ namespace OrcaSql.OSMS
             foreach (var proc in procedures)
 			{
 				var procNode = proceduresNode.Nodes.Add(proc.Name);
-				procNode.ContextMenu = procedureMenu;
+				procNode.ContextMenuStrip = procedureMenu;
 			}
 		}
 
@@ -336,9 +336,9 @@ namespace OrcaSql.OSMS
             AddNodes(_baseTableInfo.Names, baseTableNode, baseTableMenu);
         }
 
-        private static void AddNodes(IEnumerable<string> nodeNames, TreeNode parentNode, ContextMenu contextMenu)
+        private static void AddNodes(IEnumerable<string> nodeNames, TreeNode parentNode, ContextMenuStrip contextMenu)
         {
-            var nodeWithContextMenu = new TreeNode {ContextMenu = contextMenu};
+            var nodeWithContextMenu = new TreeNode {ContextMenuStrip = contextMenu};
 
             var nodes = nodeNames.Select(x => CloneNodeWithText(nodeWithContextMenu, x)).ToArray();
 
@@ -382,7 +382,7 @@ namespace OrcaSql.OSMS
                 //tableNode.ToolTipText = $"{t.RowCount} rows";
                 tableNode.Tag = t.RowCount;
 
-                tableNode.ContextMenu = tableMenu;
+                tableNode.ContextMenuStrip = tableMenu;
 
 				// Add columns
 				var tableColumnsNode = tableNode.Nodes.Add("Columns");

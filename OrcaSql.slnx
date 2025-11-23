@@ -1,0 +1,35 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="Mixed Platforms" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="src/OrcaSql.Core.Tests/OrcaSql.Core.Tests.csproj" Id="c6062a74-a3b2-4102-84d4-a658aa8011b3">
+    <Build Solution="*|x86" Project="false" />
+  </Project>
+  <Project Path="src/OrcaSql.Core/OrcaSql.Core.csproj" Id="829a5c51-cb21-4de2-9021-44f6d804d231">
+    <Build Solution="*|x86" Project="false" />
+  </Project>
+  <Project Path="src/OrcaSql.Framework.Tests/OrcaSql.Framework.Tests.csproj" Id="8d1aa5c3-74c2-4041-8f1d-303376d81584">
+    <Build Solution="*|x86" Project="false" />
+  </Project>
+  <Project Path="src/OrcaSql.Framework/OrcaSql.Framework.csproj" Id="4d581cdb-a39c-4c0c-ae2c-6a3070b8983c">
+    <Build Solution="*|x86" Project="false" />
+  </Project>
+  <Project Path="src/OrcaSql.OSMS/OrcaSql.OSMS.csproj" Id="b93d138e-c67f-43ae-bb84-6bd1c94b5adb">
+    <Platform Solution="*|x86" Project="x86" />
+    <Platform Solution="Release|Mixed Platforms" Project="x86" />
+  </Project>
+  <Project Path="src/OrcaSql.RawCore.Tests/OrcaSql.RawCore.Tests.csproj" Id="c48d6079-9a39-4834-8376-f33a69cc058c">
+    <Build Solution="*|x86" Project="false" />
+  </Project>
+  <Project Path="src/OrcaSql.RawCore/OrcaSql.RawCore.csproj" Id="57cfdbd5-8673-4e96-944a-9f9e4c9b50a4">
+    <Build Solution="*|x86" Project="false" />
+  </Project>
+  <Project Path="src/OrcaSql.Scripting/OrcaSql.Scripting.csproj" Id="78891bbf-1e07-4ed6-95bb-b6ce03cb77a1" />
+  <Project Path="src/OrcaSql.SQLConnectionDialog/OrcaSql.SQLConnectionDialog.csproj" Id="7396033c-0d1d-4687-99c8-ffe944374754">
+    <Platform Solution="*|x86" Project="x86" />
+    <Platform Solution="Release|Mixed Platforms" Project="x86" />
+  </Project>
+</Solution>

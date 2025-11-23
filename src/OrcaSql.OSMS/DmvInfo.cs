@@ -5,6 +5,7 @@ using OrcaSql.Core.MetaData;
 using OrcaSql.Core.MetaData.DMVs;
 using Object = OrcaSql.Core.MetaData.DMVs.Object;
 using Type = OrcaSql.Core.MetaData.DMVs.Type;
+using Index = OrcaSql.Core.MetaData.DMVs.Index;
 
 namespace OrcaSql.OSMS
 {
