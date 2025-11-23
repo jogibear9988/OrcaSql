@@ -10,6 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrcaSql.Core\OrcaSql.Core.csproj" />
+    <ProjectReference Include="..\OrcaSql.Framework.Tests\OrcaSql.Framework.Tests.csproj" />
     <ProjectReference Include="..\OrcaSql.Framework\OrcaSql.Framework.csproj" />
   </ItemGroup>
 </Project>

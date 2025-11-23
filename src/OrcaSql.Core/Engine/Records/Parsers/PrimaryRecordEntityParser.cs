@@ -14,7 +14,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
         static PrimaryRecordEntityParser()
         {
-            _recordsToSkip = new[]{ RecordType.BlobFragment , RecordType.GhostData }.ToHashSet();
+            _recordsToSkip = new HashSet<RecordType>(new[]{ RecordType.BlobFragment , RecordType.GhostData });
         }
 
 		internal PrimaryRecordEntityParser(PrimaryRecordPage page, CompressionContext compression)

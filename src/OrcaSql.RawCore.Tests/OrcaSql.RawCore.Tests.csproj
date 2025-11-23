@@ -9,6 +9,7 @@
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OrcaSql.Framework.Tests\OrcaSql.Framework.Tests.csproj" />
     <ProjectReference Include="..\OrcaSql.Framework\OrcaSql.Framework.csproj" />
     <ProjectReference Include="..\OrcaSql.RawCore\OrcaSql.RawCore.csproj" />
   </ItemGroup>
