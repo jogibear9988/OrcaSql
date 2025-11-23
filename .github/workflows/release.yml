@@ -49,3 +49,11 @@ jobs:
       with:
         files: 'src/OrcaSql.Framework/bin/Release/netstandard2.0/OrcaSql.Framework.dll'
         repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Zip OSMS
+      working-directory: ./src/OrcaSql.OSMS/bin/Release/net8.0-windows
+      run: zip -r OrcaSql.OSMS-${{ github.event.release.tag_name }}.zip .
+    - name: Upload to release
+      uses: AButler/upload-release-assets@v3.0
+      with:
+        files: 'src/OrcaSql.OSMS/bin/Release/net8.0-windows/OrcaSql.OSMS-${{ github.event.release.tag_name }}.zip'
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
