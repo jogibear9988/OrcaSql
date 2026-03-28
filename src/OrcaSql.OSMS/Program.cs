@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using System.Windows.Forms;
 using ICSharpCode.TextEditor.Document;
 using OrcaSql.OSMS.SQLEditor;
@@ -11,7 +12,9 @@ namespace OrcaSql.OSMS
 		[STAThread]
 		static void Main(string[] args)
 		{
-			Application.EnableVisualStyles();
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            
+            Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
             var fsmProvider = new AppSyntaxModeProvider(); // Create new provider with the highlighting directory.
             HighlightingManager.Manager.AddSyntaxModeFileProvider(fsmProvider); // Attach to the text editor.
