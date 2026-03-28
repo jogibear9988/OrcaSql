@@ -50,6 +50,15 @@ namespace OrcaSql.Core.Engine
 		}
 
 		/// <summary>
+		/// Scans pages found via IAM page chain, returning an IEnumerable of typed rows with data & schema.
+		/// This is more reliable than ScanLinkedDataPages when pgfirst in sysallocunits is stale.
+		/// </summary>
+		internal IEnumerable<TDataRow> ScanIamDataPages<TDataRow>(PagePointer iamPageLoc, CompressionContext compression) where TDataRow : Row, new()
+		{
+			return ScanHeap(iamPageLoc, new DataExtractorHelper(new TDataRow()), compression, true).Cast<TDataRow>();
+		}
+
+		/// <summary>
 		/// Starts at the data page (loc) and follows the NextPage pointer chain till the end.
 		/// </summary>
 		internal IEnumerable<Row> ScanLinkedDataPages(PagePointer loc, DataExtractorHelper schema,
@@ -58,7 +67,7 @@ namespace OrcaSql.Core.Engine
 			while (PagePointer.Zero != loc && loc != null && loc.PageID > 0)
 			{
 				var recordParser = RecordEntityParser.CreateEntityParserForPage(loc, compression, Database, isSysTable);
-				
+
 				foreach (var dr in recordParser.GetEntities(schema))
 					yield return dr;
 
@@ -119,10 +128,17 @@ namespace OrcaSql.Core.Engine
 
             var schemaWrapper = new DataExtractorHelper(schema, Database.Dmvs, null, partitionColumns, defaultConstraints);
 
-            // Heap tables won't have root pages, thus we can check whether a root page is defined for the HOBT allocation unit
-            if (au.RootPagePointer != PagePointer.Zero && useClusteredIndex)
+            // For system tables, use IAM-based scanning since pgfirst in sysallocunits
+            // can become stale after page splits and point to wrong pages.
+            if (isSysTable)
             {
-                var currentPage = isSysTable ? au.FirstPagePointer : au.RootPagePointer;
+                foreach (var row in ScanHeap(au.FirstIamPagePointer, schemaWrapper, compression, isSysTable))
+                    yield return row;
+            }
+            // Heap tables won't have root pages, thus we can check whether a root page is defined for the HOBT allocation unit
+            else if (au.RootPagePointer != PagePointer.Zero && useClusteredIndex)
+            {
+                var currentPage = au.RootPagePointer;
 
                 if (currentPage != au.FirstPagePointer)
                 {
@@ -185,6 +201,11 @@ namespace OrcaSql.Core.Engine
 				// Loop each header slot and yield the results, provided the header slot is allocated
 				foreach (var slot in iamPageSlots.Where(x => x != PagePointer.Zero))
 				{
+					// Skip non-Data pages (e.g. Index pages in system table allocation units)
+					var slotPageHeader = new Pages.PageHeader(Database.GetPageBytes(slot, isSysTable).Take(96).ToArray());
+					if (slotPageHeader.Type != Pages.PageType.Data)
+						continue;
+
 					var recordParser = RecordEntityParser.CreateEntityParserForPage(slot, compression, Database, isSysTable);
 
 					foreach (var dr in recordParser.GetEntities(schema))
@@ -196,13 +217,18 @@ namespace OrcaSql.Core.Engine
 				{
 					// Get PFS page that tracks this extent
 					var pfs = Database.GetPfsPage(PfsPage.GetPfsPointerForPage(extent.StartPage));
-					
+
 					foreach (var pageLoc in extent.GetPagePointers())
 					{
 						// Check if page is allocated according to PFS page
 						var pfsDescription = pfs.GetPageDescription(pageLoc.PageID);
 
 						if(!pfsDescription.IsAllocated)
+							continue;
+
+						// Skip non-Data pages (e.g. Index pages in system table allocation units)
+						var pageHeader = new Pages.PageHeader(Database.GetPageBytes(pageLoc, !isSysTable).Take(96).ToArray());
+						if (pageHeader.Type != Pages.PageType.Data)
 							continue;
 
 						var recordParser = RecordEntityParser.CreateEntityParserForPage(pageLoc, compression, Database, isSysTable);

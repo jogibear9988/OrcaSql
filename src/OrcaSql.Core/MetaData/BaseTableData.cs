@@ -20,7 +20,7 @@ namespace OrcaSql.Core.MetaData
         public IList<sysrowset> SysRowsets { get; private set; }
         public IList<sysrscol> SysRsCols { get; private set; }
         public IList<syssingleobjref> SysSingleObjRefs { get; private set; }
-		
+
 		private IList<sysidxstat> _sysidxstats;
         public IList<sysidxstat> SysIdxStats => _sysidxstats ?? (_sysidxstats = _scanner.ScanTable<sysidxstat>(nameof(SysIdxStats).ToLowerInvariant()).ToList());
 
@@ -65,108 +65,81 @@ namespace OrcaSql.Core.MetaData
 
         private void parseSyssingleobjrefs()
 		{
-			// Using a fixed object ID, we can look up the partition for sysscalartypes and scan the hobt AU from there
 			long rowsetID = SysRowsets
 				.Where(x => x.idmajor == (int)SystemObject.syssingleobjrefs && x.idminor == 1)
 				.Single()
 				.rowsetid;
 
-			var pageLoc = new PagePointer(
-				SysAllocUnits
-					.Where(x => x.auid == rowsetID && x.type == 1)
-					.Single()
-					.pgfirst
-			);
+			var au = SysAllocUnits
+				.Where(x => x.auid == rowsetID && x.type == 1)
+				.Single();
 
-			SysSingleObjRefs = _scanner.ScanLinkedDataPages<syssingleobjref>(pageLoc, CompressionContext.NoCompression).ToList();
+			SysSingleObjRefs = _scanner.ScanIamDataPages<syssingleobjref>(new PagePointer(au.pgfirstiam), CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSysrscols()
 		{
-			// Using a fixed object ID, we can look up the partition for sysscalartypes and scan the hobt AU from there
 			long rowsetID = SysRowsets
 				.Where(x => x.idmajor == (int)SystemObject.sysrscols && x.idminor == 1)
 				.Single()
 				.rowsetid;
 
-			var pageLoc = new PagePointer(
-				SysAllocUnits
-					.Where(x => x.auid == rowsetID && x.type == 1)
-					.Single()
-					.pgfirst
-			);
+			var au = SysAllocUnits
+				.Where(x => x.auid == rowsetID && x.type == 1)
+				.Single();
 
-			SysRsCols = _scanner.ScanLinkedDataPages<sysrscol>(pageLoc, CompressionContext.NoCompression).ToList();
+			SysRsCols = _scanner.ScanIamDataPages<sysrscol>(new PagePointer(au.pgfirstiam), CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSysscalartypes()
 		{
-			// Using a fixed object ID, we can look up the partition for sysscalartypes and scan the hobt AU from there
 			long rowsetID = SysRowsets
 				.Where(x => x.idmajor == (int)SystemObject.sysscalartypes && x.idminor == 1)
 				.Single()
 				.rowsetid;
 
-			var pageLoc = new PagePointer(
-				SysAllocUnits
-					.Where(x => x.auid == rowsetID && x.type == 1)
-					.Single()
-					.pgfirst
-			);
-			
-			SysScalarTypes = _scanner.ScanLinkedDataPages<sysscalartype>(pageLoc, CompressionContext.NoCompression).ToList();
+			var au = SysAllocUnits
+				.Where(x => x.auid == rowsetID && x.type == 1)
+				.Single();
+
+			SysScalarTypes = _scanner.ScanIamDataPages<sysscalartype>(new PagePointer(au.pgfirstiam), CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSysobjects()
 		{
-			// Using a fixed object ID, we can look up the partition for sysschobjs and scan the hobt AU from there
 			long rowsetID = SysRowsets
 				.Where(x => x.idmajor == (int)SystemObject.sysschobjs && x.idminor == 1)
 				.Single()
 				.rowsetid;
 
-			var pageLoc = new PagePointer(
-				SysAllocUnits
-					.Where(x => x.auid == rowsetID && x.type == 1)
-					.Single()
-					.pgfirst
-			);
+			var au = SysAllocUnits
+				.Where(x => x.auid == rowsetID && x.type == 1)
+				.Single();
 
-			SysSchObjs = _scanner.ScanLinkedDataPages<sysschobj>(pageLoc, CompressionContext.NoCompression).ToList();
+			SysSchObjs = _scanner.ScanIamDataPages<sysschobj>(new PagePointer(au.pgfirstiam), CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSyscolpars()
 		{
-			// Using a fixed object ID, we can look up the partition for syscolpars and scan the hobt AU from there
 			long rowsetID = SysRowsets
 				.Where(x => x.idmajor == (int)SystemObject.syscolpars && x.idminor == 1)
 				.Single()
 				.rowsetid;
 
-			var pageLoc = new PagePointer(
-				SysAllocUnits
-					.Where(x => x.auid == rowsetID && x.type == 1)
-					.Single()
-					.pgfirst
-			);
+			var au = SysAllocUnits
+				.Where(x => x.auid == rowsetID && x.type == 1)
+				.Single();
 
-			SysColPars = _scanner.ScanLinkedDataPages<syscolpar>(pageLoc, CompressionContext.NoCompression).ToList();
+			SysColPars = _scanner.ScanIamDataPages<syscolpar>(new PagePointer(au.pgfirstiam), CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSysrowsets()
 		{
-			// Using a fixed allocation unit ID, we can look up the hobt AU and scan it
-			var pageLoc = new PagePointer(
-				SysAllocUnits
+			var au = SysAllocUnits
 			        .Where(x => x.auid == FixedSystemObjectAllocationUnits.sysrowsets)
-			        .Single()
-			        .pgfirst
-			);
+			        .Single();
 
-			var pp = new PagePointer(1, 1951);
-            var a = _scanner.ScanLinkedDataPages<sysrowset>(pp, CompressionContext.NoCompression);
-			var qqq = SysAllocUnits.Where(x => x.auid == 0x0001000000220000).ToList();
-            SysRowsets = _scanner.ScanLinkedDataPages<sysrowset>(pageLoc, CompressionContext.NoCompression).ToList();
+            SysRowsets = _scanner.ScanIamDataPages<sysrowset>(new PagePointer(au.pgfirstiam), CompressionContext.NoCompression).ToList();
 		}
 
 		private void parseSysallocunits()
