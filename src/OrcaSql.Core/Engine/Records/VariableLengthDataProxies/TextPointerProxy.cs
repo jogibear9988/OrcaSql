@@ -26,7 +26,7 @@ namespace OrcaSql.Core.Engine.Records.VariableLengthDataProxies
 			*/
 
 			timestamp = BitConverter.ToInt32(bytes, 0);
-			lobRootSlot = new SlotPointer(bytes.Skip(8).ToArray());
+			lobRootSlot = new SlotPointer(bytes.Skip(bytes.Length == 24 ? 16 : 8).Take(8).ToArray());
 		}
 		
 		public IEnumerable<byte> GetBytes()

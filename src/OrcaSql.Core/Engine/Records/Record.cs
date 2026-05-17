@@ -74,13 +74,12 @@ namespace OrcaSql.Core.Engine.Records
 				// - Row-overflow pointer (one-byte value of 2)
 				// First we'll try to read just the very first pointer - hitting case values like 5 and 2. 1024 will result in a value of 0. In that specific
 				// case we then try to read a two-byte value.
-				// Finally complex columns also store 16 byte LOB pointers. Since these do not store a complex column type ID but are the only 16-byte length
-				// complex columns (except for the rare 16-byte sparse vector) we'll use that fact to detect them and retrieve the referenced data. This *is*
-				// a bug, I'm just postponing the necessary refactoring for now.
+				// Finally complex columns also store LOB pointers. Since these do not store a complex column type ID,
+				// we'll use the known 16-byte and 24-byte pointer lengths to detect them and retrieve the referenced data.
 				if (complexColumn)
 				{
-					// If length == 16 then we're dealing with a LOB pointer, otherwise it's a regular complex column
-					if (RawVariableLengthColumnData[i].Length == 16)
+					// SQL Server 2000 text/image pointers are 24 bytes, Yukon+ pointers are 16 bytes.
+					if (RawVariableLengthColumnData[i].Length == 16 || RawVariableLengthColumnData[i].Length == 24)
 						VariableLengthColumnData[i] = new TextPointerProxy(Page, RawVariableLengthColumnData[i]);
 					else
 					{
