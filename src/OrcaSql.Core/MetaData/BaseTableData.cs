@@ -478,7 +478,7 @@ namespace OrcaSql.Core.MetaData
 		{
 			var rowset = SysRowsets
 				.SingleOrDefault(x => x.idmajor == (int)SystemObject.syssingleobjrefs && x.idminor == 1);
-            if (rowset == null && _db.UsesSqlServer2000Metadata)
+            if (rowset == null)
             {
                 SysSingleObjRefs = new List<syssingleobjref>();
                 return;
@@ -497,7 +497,7 @@ namespace OrcaSql.Core.MetaData
 		{
 			var rowset = SysRowsets
 				.SingleOrDefault(x => x.idmajor == (int)SystemObject.sysrscols && x.idminor == 1);
-            if (rowset == null && _db.UsesSqlServer2000Metadata)
+            if (rowset == null)
             {
                 SysRsCols = new List<sysrscol>();
                 return;

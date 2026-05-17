@@ -131,7 +131,7 @@ namespace OrcaSql.Core.MetaData
 		/// </summary>
 		internal bool PartitionHasVardecimalColumns(long partitionID)
         {
-            if (_db.UsesSqlServer2000Metadata)
+            if (_db.UsesLegacyPartitionMetadata)
                 return false;
 
             // Get the vardecimal type id

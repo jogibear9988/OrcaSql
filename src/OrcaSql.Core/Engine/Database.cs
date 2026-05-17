@@ -20,6 +20,7 @@ namespace OrcaSql.Core.Engine
         public short CreateVersion { get; }
         internal bool IsSqlServer2000 => Version <= 539;
         internal bool UsesSqlServer2000Metadata => IsSqlServer2000 || CreateVersion <= 539;
+        internal bool UsesLegacyPartitionMetadata => UsesSqlServer2000Metadata || (BaseTables?.SysRsCols?.Count == 0);
         public Guid BindingID { get; private set; }
         public DmvGenerator Dmvs { get; }
 

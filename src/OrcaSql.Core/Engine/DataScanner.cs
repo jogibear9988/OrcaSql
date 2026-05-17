@@ -128,15 +128,15 @@ namespace OrcaSql.Core.Engine
 
             var useClusteredIndex = isSysTable || clusteredIndex != null;
 
-            var partitionColumns = isSysTable || Database.UsesSqlServer2000Metadata ? null : Database.Dmvs.SystemInternalsPartitionColumns.Where(x => x.PartitionID == partition.PartitionID).ToArray();
+            var partitionColumns = isSysTable || Database.UsesLegacyPartitionMetadata ? null : Database.Dmvs.SystemInternalsPartitionColumns.Where(x => x.PartitionID == partition.PartitionID).ToArray();
 
-            var defaultConstraints = isSysTable || Database.UsesSqlServer2000Metadata ? null : Database.Dmvs.SysDefaultConstraints.Where(x => x.ParentObjectId == partition.ObjectID).ToArray();
+            var defaultConstraints = isSysTable || Database.UsesLegacyPartitionMetadata ? null : Database.Dmvs.SysDefaultConstraints.Where(x => x.ParentObjectId == partition.ObjectID).ToArray();
 
             var schemaWrapper = new DataExtractorHelper(schema, Database.Dmvs, null, partitionColumns, defaultConstraints);
 
             // For system tables and SQL Server 2000 tables, use IAM-based scanning since
             // pgfirst/root pointers can become stale or use older index layouts.
-            if (isSysTable || Database.UsesSqlServer2000Metadata)
+            if (isSysTable || Database.UsesLegacyPartitionMetadata)
             {
                 foreach (var row in ScanHeap(au.FirstIamPagePointer, schemaWrapper, compression, isSysTable))
                     yield return row;
