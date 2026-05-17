@@ -40,8 +40,8 @@ namespace OrcaSql.Core.MetaData.BaseTables
 		internal int status { get { return Field<int>("status"); } }
 		internal short fgidfs { get { return Field<short>("fgidfs"); } }
 		internal long rcrows { get { return Field<long>("rcrows"); } }
-		internal byte cmprlevel { get { return Field<byte>("cmprlevel"); } }
-		internal byte fillfact { get { return Field<byte>("fillfact"); } }
+		internal byte cmprlevel { get { return this["cmprlevel"] == null ? (byte)0 : Field<byte>("cmprlevel"); } }
+		internal byte fillfact { get { return this["fillfact"] == null ? (byte)0 : Field<byte>("fillfact"); } }
 		internal short maxnullbit { get { return Field<short>("maxnullbit"); } }
 		internal int maxleaf { get { return Field<int>("maxleaf"); } }
 		internal short maxint { get { return Field<short>("maxint"); } }

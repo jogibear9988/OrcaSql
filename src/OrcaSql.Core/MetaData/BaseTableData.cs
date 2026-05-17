@@ -474,12 +474,17 @@ namespace OrcaSql.Core.MetaData
             return value?.TrimEnd('\0', ' ', '†');
         }
 
-        private void parseSyssingleobjrefs()
+		private void parseSyssingleobjrefs()
 		{
-			long rowsetID = SysRowsets
-				.Where(x => x.idmajor == (int)SystemObject.syssingleobjrefs && x.idminor == 1)
-				.Single()
-				.rowsetid;
+			var rowset = SysRowsets
+				.SingleOrDefault(x => x.idmajor == (int)SystemObject.syssingleobjrefs && x.idminor == 1);
+            if (rowset == null && _db.UsesSqlServer2000Metadata)
+            {
+                SysSingleObjRefs = new List<syssingleobjref>();
+                return;
+            }
+
+            long rowsetID = rowset.rowsetid;
 
 			var au = SysAllocUnits
 				.Where(x => x.auid == rowsetID && x.type == 1)
@@ -490,10 +495,15 @@ namespace OrcaSql.Core.MetaData
 
 		private void parseSysrscols()
 		{
-			long rowsetID = SysRowsets
-				.Where(x => x.idmajor == (int)SystemObject.sysrscols && x.idminor == 1)
-				.Single()
-				.rowsetid;
+			var rowset = SysRowsets
+				.SingleOrDefault(x => x.idmajor == (int)SystemObject.sysrscols && x.idminor == 1);
+            if (rowset == null && _db.UsesSqlServer2000Metadata)
+            {
+                SysRsCols = new List<sysrscol>();
+                return;
+            }
+
+            long rowsetID = rowset.rowsetid;
 
 			var au = SysAllocUnits
 				.Where(x => x.auid == rowsetID && x.type == 1)
