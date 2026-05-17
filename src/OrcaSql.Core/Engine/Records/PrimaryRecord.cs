@@ -18,17 +18,48 @@ namespace OrcaSql.Core.Engine.Records
 			// Parse status bits A
 			parseStatusBitsA(new BitArray(new [] { bytes[offset++] }));
 
+			if (SkipDataParsing(Type))
+			{
+				if (bytes.Length > offset)
+					parseStatusBitsB(bytes[offset++]);
+
+				FixedLengthData = new byte[0];
+				RawBytes = bytes.Take(offset).ToArray();
+				return;
+			}
+
 			// TODO: Strategize this stuff to avoid ifs, switches & impersonation
 			if(Type == RecordType.ForwardingStub)
 			{
 				// Forwarding stub only has one status byte. Remaining 8 bytes are for (PageID, FileID, Slot)
 				FixedLengthData = bytes.Skip(1).Take(8).ToArray();
+
+				if (FixedLengthData.Length < 8)
+				{
+					IsGhostForwardedRecord = true;
+					RawBytes = bytes;
+					return;
+				}
 				
 				int pageID = BitConverter.ToInt32(bytes, 1);
 				short fileID = BitConverter.ToInt16(bytes, 5);
 				short slot = BitConverter.ToInt16(bytes, 7);
 
+				if (fileID <= 0 || pageID <= 0 || slot < 0 || page?.Database == null || !page.Database.Files.ContainsKey(fileID))
+				{
+					IsGhostForwardedRecord = true;
+					RawBytes = bytes.Take(9).ToArray();
+					return;
+				}
+
 				var forwardPage = page.Database.GetPrimaryRecordPage(new PagePointer(fileID, pageID), CompressionContext.NoCompression);
+				if (slot >= forwardPage.Records.Length)
+				{
+					IsGhostForwardedRecord = true;
+					RawBytes = bytes.Take(9).ToArray();
+					return;
+				}
+
 				byte[] forwardedRecordBytes = forwardPage.Records[slot].RawBytes;
 
 				parseStatusBitsA(new BitArray(new[] {forwardedRecordBytes[0]}));
@@ -43,8 +74,16 @@ namespace OrcaSql.Core.Engine.Records
 			parseStatusBitsB(bytes[offset++]);
 
 			// Parse fixed length size
-			short fixedLengthSize = BitConverter.ToInt16(bytes, offset);
-			fixedLengthSize -= 4;
+			short fixedLengthOffset = BitConverter.ToInt16(bytes, offset);
+			if (fixedLengthOffset < 4 || fixedLengthOffset + 2 > bytes.Length)
+			{
+				IsGhostForwardedRecord = true;
+				FixedLengthData = new byte[0];
+				RawBytes = bytes.Take(offset + 2).ToArray();
+				return;
+			}
+
+			short fixedLengthSize = (short)(fixedLengthOffset - 4);
 			offset += 2;
 
 			// Parse fixed length data
@@ -55,13 +94,26 @@ namespace OrcaSql.Core.Engine.Records
 			NumberOfColumns = BitConverter.ToInt16(bytes, offset);
 			offset += 2;
 
-			// Parse null bitmap, if present
-			if (HasNullBitmap)
-				offset = ParseNullBitmap(bytes, ref offset);
+			try
+			{
+				// Parse null bitmap, if present
+				if (HasNullBitmap)
+					offset = ParseNullBitmap(bytes, ref offset);
 
-			// Parse variable length columns, if present
-			if (HasVariableLengthColumns)
-				ParseVariableLengthColumns(bytes, ref offset);
+				// Parse variable length columns, if present
+				if (HasVariableLengthColumns)
+					ParseVariableLengthColumns(bytes, ref offset);
+			}
+			catch (Exception ex) when (ex is ArgumentOutOfRangeException
+			                           || ex is IndexOutOfRangeException
+			                           || ex is OverflowException
+			                           || ex is ArgumentException)
+			{
+				IsGhostForwardedRecord = true;
+				FixedLengthData = new byte[0];
+				RawBytes = bytes.Take(Math.Min(bytes.Length, offset)).ToArray();
+				return;
+			}
 
 			// Save complete record raw bytes
 			RawBytes = bytes.Take(offset).ToArray();
@@ -92,6 +144,14 @@ namespace OrcaSql.Core.Engine.Records
 			// we can simply read the whole byte value instead of extracting the first
 			// bit explicitly.
 			IsGhostForwardedRecord = bits == 1;
+		}
+
+		internal static bool SkipDataParsing(RecordType type)
+		{
+			return type == RecordType.BlobFragment
+			       || type == RecordType.GhostIndex
+			       || type == RecordType.GhostData
+			       || type == RecordType.GhostVersion;
 		}
 	}
 }

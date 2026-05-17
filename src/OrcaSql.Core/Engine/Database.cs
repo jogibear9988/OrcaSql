@@ -16,6 +16,8 @@ namespace OrcaSql.Core.Engine
     {
         public string Name { get; }
         public short ID { get; }
+        public short Version { get; }
+        internal bool IsSqlServer2000 => Version <= 539;
         public Guid BindingID { get; private set; }
         public DmvGenerator Dmvs { get; }
 
@@ -56,6 +58,7 @@ namespace OrcaSql.Core.Engine
             var bootPage = GetBootPage();
             Name = bootPage.DatabaseName;
             ID = bootPage.DBID;
+            Version = bootPage.Version;
             var collation = Collations.GetByCollationId((int) (bootPage.CollationId >> 32));
             DefaultCollation = collation.Name;
             Encoding = Collations.GetEncodingForCollation(collation);
@@ -80,6 +83,7 @@ namespace OrcaSql.Core.Engine
             var bootPage = GetBootPage();
             Name = bootPage.DatabaseName;
             ID = bootPage.DBID;
+            Version = bootPage.Version;
             var collation = Collations.GetByCollationId((int)(bootPage.CollationId >> 32));
             DefaultCollation = collation.Name;
             Encoding = Collations.GetEncodingForCollation(collation);

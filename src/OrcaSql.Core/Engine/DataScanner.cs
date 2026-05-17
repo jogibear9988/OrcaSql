@@ -58,6 +58,12 @@ namespace OrcaSql.Core.Engine
 			return ScanHeap(iamPageLoc, new DataExtractorHelper(new TDataRow()), compression, true).Cast<TDataRow>();
 		}
 
+		internal IEnumerable<Row> ScanIamDataPages(PagePointer iamPageLoc, DataExtractorHelper schema,
+            CompressionContext compression, bool isSysTable)
+		{
+			return ScanHeap(iamPageLoc, schema, compression, isSysTable);
+		}
+
 		/// <summary>
 		/// Starts at the data page (loc) and follows the NextPage pointer chain till the end.
 		/// </summary>
@@ -122,15 +128,15 @@ namespace OrcaSql.Core.Engine
 
             var useClusteredIndex = isSysTable || clusteredIndex != null;
 
-            var partitionColumns = isSysTable ? null : Database.Dmvs.SystemInternalsPartitionColumns.Where(x => x.PartitionID == partition.PartitionID).ToArray();
+            var partitionColumns = isSysTable || Database.IsSqlServer2000 ? null : Database.Dmvs.SystemInternalsPartitionColumns.Where(x => x.PartitionID == partition.PartitionID).ToArray();
 
-            var defaultConstraints = isSysTable ? null : Database.Dmvs.SysDefaultConstraints.Where(x => x.ParentObjectId == partition.ObjectID).ToArray();
+            var defaultConstraints = isSysTable || Database.IsSqlServer2000 ? null : Database.Dmvs.SysDefaultConstraints.Where(x => x.ParentObjectId == partition.ObjectID).ToArray();
 
             var schemaWrapper = new DataExtractorHelper(schema, Database.Dmvs, null, partitionColumns, defaultConstraints);
 
-            // For system tables, use IAM-based scanning since pgfirst in sysallocunits
-            // can become stale after page splits and point to wrong pages.
-            if (isSysTable)
+            // For system tables and SQL Server 2000 tables, use IAM-based scanning since
+            // pgfirst/root pointers can become stale or use older index layouts.
+            if (isSysTable || Database.IsSqlServer2000)
             {
                 foreach (var row in ScanHeap(au.FirstIamPagePointer, schemaWrapper, compression, isSysTable))
                     yield return row;
@@ -176,6 +182,9 @@ namespace OrcaSql.Core.Engine
 			// Traverse the linked list of IAM pages until the tail pointer is zero
 			while (loc != PagePointer.Zero)
 			{
+				if (!PageExists(loc))
+					yield break;
+
 				// Before scanning, check that the IAM page itself is allocated
 				var pfsPage = Database.GetPfsPage(PfsPage.GetPfsPointerForPage(loc));
 
@@ -199,7 +208,7 @@ namespace OrcaSql.Core.Engine
 					};
 
 				// Loop each header slot and yield the results, provided the header slot is allocated
-				foreach (var slot in iamPageSlots.Where(x => x != PagePointer.Zero))
+				foreach (var slot in iamPageSlots.Where(x => x != PagePointer.Zero && PageExists(x)))
 				{
 					// Skip non-Data pages (e.g. Index pages in system table allocation units)
 					var slotPageHeader = new Pages.PageHeader(Database.GetPageBytes(slot, isSysTable).Take(96).ToArray());
@@ -213,13 +222,16 @@ namespace OrcaSql.Core.Engine
 				}
 
 				// Then loop through allocated extents and yield results
-				foreach (var extent in iamPage.GetAllocatedExtents())
+				foreach (var extent in iamPage.GetAllocatedExtents().Where(extent => PageExists(extent.StartPage)))
 				{
 					// Get PFS page that tracks this extent
 					var pfs = Database.GetPfsPage(PfsPage.GetPfsPointerForPage(extent.StartPage));
 
 					foreach (var pageLoc in extent.GetPagePointers())
 					{
+						if (!PageExists(pageLoc))
+							continue;
+
 						// Check if page is allocated according to PFS page
 						var pfsDescription = pfs.GetPageDescription(pageLoc.PageID);
 
@@ -241,6 +253,17 @@ namespace OrcaSql.Core.Engine
 				// Update current IAM chain location to the tail pointer
 				loc = iamPage.Header.NextPage;
 			}
+		}
+
+		private bool PageExists(PagePointer page)
+		{
+			if (page == null || page.FileID <= 0 || page.PageID < 0)
+				return false;
+
+			if (!Database.Files.TryGetValue(page.FileID, out var file))
+				return false;
+
+			return page.PageID < file.Length / 8192;
 		}
     }
 }

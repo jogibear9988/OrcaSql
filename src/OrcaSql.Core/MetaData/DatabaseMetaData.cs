@@ -131,6 +131,9 @@ namespace OrcaSql.Core.MetaData
 		/// </summary>
 		internal bool PartitionHasVardecimalColumns(long partitionID)
         {
+            if (_db.IsSqlServer2000)
+                return false;
+
             // Get the vardecimal type id
             byte vardecimalTypeID = _db.Dmvs.Types
                 .Where(t => t.Name == "decimal")
@@ -174,11 +177,44 @@ namespace OrcaSql.Core.MetaData
                 columnsList.Add(DataColumn.Uniquifier);
 
 
-            foreach (var col in syscols)
+            var sql2000ColumnOffsets = _db.IsSqlServer2000
+                ? _db.BaseTables.SysColPars
+                    .Where(c => c.id == table.ObjectID)
+                    .GroupBy(c => c.colid)
+                    .ToDictionary(g => g.Key, g => (int)g.First().maxinrow)
+                : null;
+            var seenColumnNames = new HashSet<string>();
+            var nextColumnId = 1;
+            var fixedLengthSoFar = 0;
+            foreach (var col in syscols.OrderBy(c => c.ColumnID))
             {
-                var typeName = GetColumnTypeName(_db.Dmvs, col);
+                if (_db.IsSqlServer2000)
+                {
+                    var paddingLength = 0;
+                    if (sql2000ColumnOffsets.TryGetValue(col.ColumnID, out var offset) && offset > 4)
+                        paddingLength = Math.Max(0, offset - 4 - fixedLengthSoFar);
 
-                var dc = new DataColumn(col.Name, typeName)
+                    while (nextColumnId < col.ColumnID)
+                    {
+                        columnsList.Add(new DataColumn("<<DROPPED" + nextColumnId + ">>", "binary(" + paddingLength + ")", true)
+                        {
+                            ColumnID = nextColumnId
+                        });
+                        fixedLengthSoFar += paddingLength;
+                        paddingLength = 0;
+                        nextColumnId++;
+                    }
+                }
+
+                var typeName = GetColumnTypeName(_db.Dmvs, col);
+                var columnName = col.Name;
+                if (_db.IsSqlServer2000 && !seenColumnNames.Add(columnName))
+                {
+                    columnName = columnName + "_" + col.ColumnID;
+                    seenColumnNames.Add(columnName);
+                }
+
+                var dc = new DataColumn(columnName, typeName)
                 {
                     IsNullable = col.IsNullable,
                     IsSparse = col.IsSparse,
@@ -187,9 +223,54 @@ namespace OrcaSql.Core.MetaData
                 };
 
                 columnsList.Add(dc);
+                if (_db.IsSqlServer2000)
+                    fixedLengthSoFar += getSql2000FixedLength(col);
+                nextColumnId = col.ColumnID + 1;
             }
 
             return new DataRow(columnsList, table.ObjectID);
+        }
+
+        private static int getSql2000FixedLength(Column col)
+        {
+            switch ((SystemType)col.SystemTypeID)
+            {
+                case SystemType.Bigint:
+                    return 8;
+                case SystemType.Binary:
+                    return col.MaxLength;
+                case SystemType.Bit:
+                    return 0;
+                case SystemType.Char:
+                    return col.MaxLength;
+                case SystemType.Datetime:
+                    return 8;
+                case SystemType.Decimal:
+                case SystemType.Numeric:
+                    return col.MaxLength;
+                case SystemType.Float:
+                    return 8;
+                case SystemType.Int:
+                    return 4;
+                case SystemType.Money:
+                    return 8;
+                case SystemType.Nchar:
+                    return col.MaxLength;
+                case SystemType.Real:
+                    return 4;
+                case SystemType.Smalldatetime:
+                    return 4;
+                case SystemType.Smallint:
+                    return 2;
+                case SystemType.Smallmoney:
+                    return 4;
+                case SystemType.Tinyint:
+                    return 1;
+                case SystemType.Uniqueidentifier:
+                    return 16;
+                default:
+                    return 0;
+            }
         }
 
 

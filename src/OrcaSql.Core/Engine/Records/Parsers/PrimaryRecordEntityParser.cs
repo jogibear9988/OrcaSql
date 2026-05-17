@@ -14,7 +14,13 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
         static PrimaryRecordEntityParser()
         {
-            _recordsToSkip = new HashSet<RecordType>(new[]{ RecordType.BlobFragment , RecordType.GhostData });
+            _recordsToSkip = new HashSet<RecordType>(new[]
+            {
+                RecordType.BlobFragment,
+                RecordType.GhostIndex,
+                RecordType.GhostData,
+                RecordType.GhostVersion
+            });
         }
 
 		internal PrimaryRecordEntityParser(PrimaryRecordPage page, CompressionContext compression)
@@ -96,7 +102,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                                     // We may run out of fixed length bytes. In certain conditions a null integer may have been added without
                                     // there being a null bitmap. In such a case, we detect the null condition by there not being enough fixed
                                     // length bytes to process.
-                                    if (valueBytes.Length > 0)
+                                    if (valueBytes.Length == fixedLength || (compression.CompressionLevel != CompressionLevel.None && valueBytes.Length > 0))
                                     {
                                         columnValue = sqlType.GetValue(valueBytes);
                                     }

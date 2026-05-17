@@ -112,64 +112,160 @@ namespace OrcaSql.Core.MetaData.DMVs
 		{
 			if (!db.ObjectCache.ContainsKey(CACHE_KEY))
 			{
-				db.ObjectCache[CACHE_KEY] = db.BaseTables.SysSchObjs
-					.Where(o => o.nsclass == 0 && o.pclass == 1)
-					.Select(o => new ObjectDollar
-						{
-							Name = o.name,
-							ObjectID = o.id,
-							PrincipalID = db.BaseTables.SysSingleObjRefs
-								.Where(r => r.depid == o.id && r.@class == 97 && r.depsubid == 0)
-								.Select(r => r.indepid)
-								.SingleOrDefault(),
-							SchemaID = o.nsid,
-							ParentObjectID = o.pid,
-							Type = o.type.Trim(),
-							TypeDesc = db.BaseTables.SysPalNames
-								.Where(n => n.@class == "OBTY" && n.value.Trim() == o.type.Trim())
-								.Select(n => n.name)
-								.SingleOrDefault(),
-							Property = o.intprop,
-							CreateDate = o.created,
-							ModifyDate = o.modified,
-							IsMSShipped = Convert.ToBoolean(o.status & 1),
-							IsAutoDropped = Convert.ToBoolean(o.status & 2),
-							IsSystemNamed = Convert.ToBoolean(o.status & 4),
-							IsPublished = Convert.ToBoolean(o.status & 16),
-							IsSchemaPublished = Convert.ToBoolean(o.status & 64),
-							LockOnBulkLoad = Convert.ToBoolean(o.status & 256),
-							IsDisabled = Convert.ToBoolean(o.status & 256),
-							IsAutoExecuted = Convert.ToBoolean(o.status & 256),
-							IsActivationEnabled = Convert.ToBoolean(o.status & 256),
-							HasOpaqueMetadata = Convert.ToBoolean(o.status & 512),
-							IsNotForReplication = Convert.ToBoolean(o.status & 512),
-							IsReceiveEnabled = Convert.ToBoolean(o.status & 512),
-							IsNotTrusted = Convert.ToBoolean(o.status & 1024),
-							IsEnqueueEnabled = Convert.ToBoolean(o.status & 1024),
-							WithCheckOption = Convert.ToBoolean(o.status & 1024),
-							IsRetentionEnabled = Convert.ToBoolean(o.status & 2048),
-							HasUncheckedAssemblyData = Convert.ToBoolean(o.status & 2048),
-							UpdateReferentialAction = Convert.ToByte((o.status / 4096) & 3),
-							DeleteReferentialAction = Convert.ToByte((o.status / 16384) & 3),
-							IsReplicated = Convert.ToBoolean(o.status & 0x1000),
-							IsExecutionReplicated = Convert.ToBoolean(o.status & 0x1000),
-							HasReplicationFilter = Convert.ToBoolean(o.status & 0x2000),
-							IsReplSerializableOnly = Convert.ToBoolean(o.status & 0x2000),
-							IsMergePublished = Convert.ToBoolean(o.status & 0x4000),
-							SkipsReplConstraints = Convert.ToBoolean(o.status & 0x4000),
-							IsSyncTranSubscribed = Convert.ToBoolean(o.status & 0x8000),
-							UsesAnsiNulls = Convert.ToBoolean(o.status & 0x40000),
-							NullOnNullInput = Convert.ToBoolean(o.status & 0x200000),
-							UsesDatabaseCollation = Convert.ToBoolean(o.status & 0x100000),
-							IsTrackedByCdc = Convert.ToBoolean(o.status & 0x01000000),
-							LargeValueTypesOutOfRow = Convert.ToBoolean(o.status & 0x02000000),
-							LockEscalationOption = Convert.ToByte((o.status & 0x30000000) / 0x10000000),
-							IsPoisonMessageHandlingEnabled = Convert.ToBoolean(o.status & 0x04000000)
-						})
-					.ToList();
+				if (db.IsSqlServer2000)
+				{
+					db.ObjectCache[CACHE_KEY] = db.BaseTables.SysSchObjs
+						.Where(o => o.nsclass == 0 && o.pclass == 1 && !string.IsNullOrWhiteSpace(o.name) && !string.IsNullOrWhiteSpace(o.type))
+						.Select(o =>
+							{
+								var type = o.type.Trim();
+								return new ObjectDollar
+									{
+										Name = o.name.TrimEnd('\0', ' '),
+										ObjectID = o.id,
+										PrincipalID = null,
+										SchemaID = o.nsid == 0 ? 1 : o.nsid,
+										ParentObjectID = o.pid,
+										Type = type,
+										TypeDesc = getSql2000ObjectTypeDescription(type),
+										Property = o.intprop,
+										CreateDate = o.created,
+										ModifyDate = o.modified,
+										IsMSShipped = Convert.ToBoolean(o.status & 1),
+										IsAutoDropped = false,
+										IsSystemNamed = false,
+										IsPublished = Convert.ToBoolean(o.status & 16),
+										IsSchemaPublished = false,
+										LockOnBulkLoad = false,
+										IsDisabled = false,
+										IsAutoExecuted = false,
+										IsActivationEnabled = false,
+										HasOpaqueMetadata = false,
+										IsNotForReplication = false,
+										IsReceiveEnabled = false,
+										IsNotTrusted = false,
+										IsEnqueueEnabled = false,
+										WithCheckOption = false,
+										IsRetentionEnabled = false,
+										HasUncheckedAssemblyData = false,
+										UpdateReferentialAction = 0,
+										DeleteReferentialAction = 0,
+										IsReplicated = false,
+										IsExecutionReplicated = false,
+										HasReplicationFilter = false,
+										IsReplSerializableOnly = false,
+										IsMergePublished = false,
+										SkipsReplConstraints = false,
+										IsSyncTranSubscribed = false,
+										UsesAnsiNulls = false,
+										NullOnNullInput = false,
+										UsesDatabaseCollation = false,
+										IsTrackedByCdc = false,
+										LargeValueTypesOutOfRow = false,
+										LockEscalationOption = 0,
+										IsPoisonMessageHandlingEnabled = false
+									};
+							})
+						.ToList();
+				}
+				else
+				{
+					db.ObjectCache[CACHE_KEY] = db.BaseTables.SysSchObjs
+						.Where(o => o.nsclass == 0 && o.pclass == 1)
+						.Select(o => new ObjectDollar
+							{
+								Name = o.name,
+								ObjectID = o.id,
+								PrincipalID = db.BaseTables.SysSingleObjRefs
+									.Where(r => r.depid == o.id && r.@class == 97 && r.depsubid == 0)
+									.Select(r => r.indepid)
+									.SingleOrDefault(),
+								SchemaID = o.nsid,
+								ParentObjectID = o.pid,
+								Type = o.type.Trim(),
+								TypeDesc = db.BaseTables.SysPalNames
+									.Where(n => n.@class == "OBTY" && n.value.Trim() == o.type.Trim())
+									.Select(n => n.name)
+									.SingleOrDefault(),
+								Property = o.intprop,
+								CreateDate = o.created,
+								ModifyDate = o.modified,
+								IsMSShipped = Convert.ToBoolean(o.status & 1),
+								IsAutoDropped = Convert.ToBoolean(o.status & 2),
+								IsSystemNamed = Convert.ToBoolean(o.status & 4),
+								IsPublished = Convert.ToBoolean(o.status & 16),
+								IsSchemaPublished = Convert.ToBoolean(o.status & 64),
+								LockOnBulkLoad = Convert.ToBoolean(o.status & 256),
+								IsDisabled = Convert.ToBoolean(o.status & 256),
+								IsAutoExecuted = Convert.ToBoolean(o.status & 256),
+								IsActivationEnabled = Convert.ToBoolean(o.status & 256),
+								HasOpaqueMetadata = Convert.ToBoolean(o.status & 512),
+								IsNotForReplication = Convert.ToBoolean(o.status & 512),
+								IsReceiveEnabled = Convert.ToBoolean(o.status & 512),
+								IsNotTrusted = Convert.ToBoolean(o.status & 1024),
+								IsEnqueueEnabled = Convert.ToBoolean(o.status & 1024),
+								WithCheckOption = Convert.ToBoolean(o.status & 1024),
+								IsRetentionEnabled = Convert.ToBoolean(o.status & 2048),
+								HasUncheckedAssemblyData = Convert.ToBoolean(o.status & 2048),
+								UpdateReferentialAction = Convert.ToByte((o.status / 4096) & 3),
+								DeleteReferentialAction = Convert.ToByte((o.status / 16384) & 3),
+								IsReplicated = Convert.ToBoolean(o.status & 0x1000),
+								IsExecutionReplicated = Convert.ToBoolean(o.status & 0x1000),
+								HasReplicationFilter = Convert.ToBoolean(o.status & 0x2000),
+								IsReplSerializableOnly = Convert.ToBoolean(o.status & 0x2000),
+								IsMergePublished = Convert.ToBoolean(o.status & 0x4000),
+								SkipsReplConstraints = Convert.ToBoolean(o.status & 0x4000),
+								IsSyncTranSubscribed = Convert.ToBoolean(o.status & 0x8000),
+								UsesAnsiNulls = Convert.ToBoolean(o.status & 0x40000),
+								NullOnNullInput = Convert.ToBoolean(o.status & 0x200000),
+								UsesDatabaseCollation = Convert.ToBoolean(o.status & 0x100000),
+								IsTrackedByCdc = Convert.ToBoolean(o.status & 0x01000000),
+								LargeValueTypesOutOfRow = Convert.ToBoolean(o.status & 0x02000000),
+								LockEscalationOption = Convert.ToByte((o.status & 0x30000000) / 0x10000000),
+								IsPoisonMessageHandlingEnabled = Convert.ToBoolean(o.status & 0x04000000)
+							})
+						.ToList();
+				}
 			}
 
 			return (IEnumerable<ObjectDollar>)db.ObjectCache[CACHE_KEY];
+		}
+
+		private static string getSql2000ObjectTypeDescription(string type)
+		{
+			switch (type)
+			{
+				case "C":
+					return "CHECK_CONSTRAINT";
+				case "D":
+					return "DEFAULT_CONSTRAINT";
+				case "F":
+					return "FOREIGN_KEY_CONSTRAINT";
+				case "FN":
+					return "SQL_SCALAR_FUNCTION";
+				case "IF":
+					return "SQL_INLINE_TABLE_VALUED_FUNCTION";
+				case "P":
+					return "SQL_STORED_PROCEDURE";
+				case "PK":
+					return "PRIMARY_KEY_CONSTRAINT";
+				case "S":
+					return "SYSTEM_TABLE";
+				case "TF":
+					return "SQL_TABLE_VALUED_FUNCTION";
+				case "TR":
+					return "SQL_TRIGGER";
+				case "U":
+					return "USER_TABLE";
+				case "UQ":
+					return "UNIQUE_CONSTRAINT";
+				case "V":
+					return "VIEW";
+				case "X":
+					return "EXTENDED_STORED_PROCEDURE";
+				default:
+					return null;
+			}
 		}
 	}
 }

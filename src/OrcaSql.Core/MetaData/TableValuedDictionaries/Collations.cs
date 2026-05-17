@@ -14,6 +14,8 @@ namespace OrcaSql.Core.MetaData.TableValuedDictionaries
 
         static Collations()
         {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
             //SELECT '{' + CAST(CollationProperty(name, 'collationid') as varchar(11)) + ', new CollationInfo { Name = "' + name + '", Lcid = ' + cast(CollationProperty(name, 'lcid') as varchar(10)) + ', TdsCollation = ' + CONVERT(VARCHAR(10), CollationProperty(name, 'tdscollation'), 1) + '}},' FROM sys.fn_helpcollations()
 
             _collations = new Dictionary<int, CollationInfo>

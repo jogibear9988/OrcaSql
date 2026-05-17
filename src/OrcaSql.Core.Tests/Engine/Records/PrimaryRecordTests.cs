@@ -48,5 +48,15 @@ namespace OrcaSql.Core.Tests.Engine.Records
 			Assert.IsTrue(record.HasVariableLengthColumns);
 			Assert.IsFalse(record.HasVersioningInformation);
 		}
+
+		[Test]
+		public void TestGhostVersionRecord()
+		{
+			var a = new byte[] { 0xff, 0x00, 0xff, 0xff };
+			var record = new PrimaryRecord(a, null);
+
+			Assert.AreEqual(RecordType.GhostVersion, record.Type);
+			Assert.AreEqual(0, record.FixedLengthData.Length);
+		}
 	}
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace OrcaSql.Core.Engine.Pages
@@ -60,7 +61,7 @@ namespace OrcaSql.Core.Engine.Pages
 				88-89	Slot7 FileID (smallint)
 			*/
 
-			byte[] header = Records[0].FixedLengthData;
+			byte[] header = getIamHeaderRecordData();
 
 			// Read iam header
 			SequenceNumber = BitConverter.ToUInt32(header, 0);
@@ -79,6 +80,43 @@ namespace OrcaSql.Core.Engine.Pages
 			Slot5 = new PagePointer(BitConverter.ToInt16(header, 76), BitConverter.ToInt32(header, 72));
 			Slot6 = new PagePointer(BitConverter.ToInt16(header, 82), BitConverter.ToInt32(header, 78));
 			Slot7 = new PagePointer(BitConverter.ToInt16(header, 88), BitConverter.ToInt32(header, 84));
+		}
+
+		private byte[] getIamHeaderRecordData()
+		{
+			var rawBytes = RawBytes.ToArray();
+			byte[] header;
+
+			if (tryGetFixedLengthRecordData(rawBytes, 96, out header) && header.Length >= 90)
+				return header;
+
+			header = Records
+				.Select(r => r.FixedLengthData)
+				.FirstOrDefault(data => data.Length >= 90);
+
+			if (header == null)
+				throw new InvalidOperationException("Unable to locate IAM header record.");
+
+			return header;
+		}
+
+		private static bool tryGetFixedLengthRecordData(byte[] bytes, int offset, out byte[] fixedLengthData)
+		{
+			fixedLengthData = null;
+
+			if (bytes == null || offset < 0 || offset + 4 > bytes.Length)
+				return false;
+
+			var fixedLengthOffset = BitConverter.ToInt16(bytes, offset + 2);
+			if (fixedLengthOffset < 4 || offset + fixedLengthOffset > bytes.Length)
+				return false;
+
+			fixedLengthData = bytes
+				.Skip(offset + 4)
+				.Take(fixedLengthOffset - 4)
+				.ToArray();
+
+			return true;
 		}
 
 		/// <summary>

@@ -44,7 +44,21 @@ namespace OrcaSql.Core.MetaData.DMVs
 		{
 			if (!db.ObjectCache.ContainsKey(CACHE_KEY))
 			{
-                db.ObjectCache[CACHE_KEY] = (from cls in db.BaseTables.SysClsObjs
+                if (db.IsSqlServer2000)
+                {
+                    db.ObjectCache[CACHE_KEY] = new[]
+                    {
+                        new SysSchema
+                        {
+                            name = "dbo",
+                            schema_id = 1,
+                            principal_id = 1
+                        }
+                    }.ToList();
+                }
+                else
+                {
+                    db.ObjectCache[CACHE_KEY] = (from cls in db.BaseTables.SysClsObjs
                                             join ors in db.BaseTables.SysSingleObjRefs 
                                             on new{ cls.id, @class = (int)cls.@class} equals new {id = ors.depid, ors.@class}
                                             where  cls.@class == 50
@@ -54,6 +68,7 @@ namespace OrcaSql.Core.MetaData.DMVs
                                                 schema_id = cls.id,
                                                 principal_id = ors.indepid
                                             }).ToList();
+                }
             }
 
 			return (IEnumerable<SysSchema>)db.ObjectCache[CACHE_KEY];
