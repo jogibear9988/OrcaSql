@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 namespace OrcaSql.Core.Engine.Pages.PFS
@@ -20,10 +19,11 @@ namespace OrcaSql.Core.Engine.Pages.PFS
 			pageDescriptions = new Dictionary<long, PfsPageByte>();
 			var pageID = Header.Pointer.PageID == 1 ? 0 : Header.Pointer.PageID;
 			
-			// Skip first 4
+			// Skip the first four bytes of the PFS body.
 			// TODO: Should treat this as the record it is, instead of misusing RawBody
-			foreach(byte pageByte in RawBody.Skip(4).Take(8088))
+			for (var offset = 100; offset < 8188; offset++)
 			{
+				var pageByte = RawBytes[offset];
 				var pfsPageDescription = new PfsPageByte(pageByte, pageID);
 				pageDescriptions.Add(pageID++, pfsPageDescription);
 			}

@@ -1,6 +1,4 @@
 using System;
-using System.Linq;
-
 namespace OrcaSql.Core.Engine.Records.LobStructures
 {
 	public class InternalLobSlotPointer : SlotPointer
@@ -14,9 +12,14 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		 * 14-15	SlotID (short)
 		 */
 		public InternalLobSlotPointer(byte[] bytes)
-			: base(bytes.Skip(8).ToArray())
+			: this(bytes, 0)
 		{
-			Offset = BitConverter.ToInt64(bytes, 0);
+		}
+
+		public InternalLobSlotPointer(byte[] bytes, int offset)
+			: base(bytes, offset + 8)
+		{
+			Offset = LittleEndian.ReadInt64(bytes, offset);
 		}
 	}
 }

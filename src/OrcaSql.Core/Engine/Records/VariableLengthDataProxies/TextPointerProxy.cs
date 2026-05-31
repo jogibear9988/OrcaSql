@@ -25,15 +25,14 @@ namespace OrcaSql.Core.Engine.Records.VariableLengthDataProxies
 			 * 8-16		Slot pointer
 			*/
 
-			timestamp = BitConverter.ToInt32(bytes, 0);
-			lobRootSlot = new SlotPointer(bytes.Skip(bytes.Length == 24 ? 16 : 8).Take(8).ToArray());
+			timestamp = LittleEndian.ReadInt32(bytes, 0);
+			lobRootSlot = new SlotPointer(bytes, bytes.Length == 24 ? 16 : 8);
 		}
 		
-		public IEnumerable<byte> GetBytes()
+		public byte[] GetBytes()
 		{
 			// Get root lob structure bytes
-			var rootLobStructurePage = OriginPage.Database.GetTextMixPage(lobRootSlot.PagePointer);
-			var rootLobRecord = rootLobStructurePage.Records[lobRootSlot.SlotID];
+			var rootLobRecord = OriginPage.Database.GetTextRecord(lobRootSlot);
 			var rootLobStructure = LobStructureFactory.Create(rootLobRecord.FixedLengthData, OriginPage.Database);
 
 			return rootLobStructure.GetData();

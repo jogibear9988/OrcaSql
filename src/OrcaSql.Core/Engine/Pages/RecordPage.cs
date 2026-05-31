@@ -1,6 +1,4 @@
 using System;
-using System.Linq;
-
 namespace OrcaSql.Core.Engine.Pages
 {
 	internal class RecordPage : Page
@@ -18,7 +16,7 @@ namespace OrcaSql.Core.Engine.Pages
 			SlotArray = new short[Header.SlotCnt];
 
 			for (int i = 0; i < Header.SlotCnt; i++)
-				SlotArray[i] = BitConverter.ToInt16(RawBytes.ToArray(), RawBytes.Count - i * 2 - 2);
+				SlotArray[i] = LittleEndian.ReadInt16(RawBytes, RawBytes.Length - i * 2 - 2);
 		}
 	}
 }

@@ -18,12 +18,17 @@ namespace OrcaSql.Core.Engine
 		}
 
 		public PagePointer(byte[] bytes)
+			: this(bytes, 0)
 		{
-			if (bytes.Length != 6)
+		}
+
+		public PagePointer(byte[] bytes, int offset)
+		{
+			if (bytes.Length - offset < 6)
 				throw new ArgumentException("Input must be 6 bytes in the format pageID(4)fileID(2).");
 
-			PageID = BitConverter.ToInt32(bytes, 0);
-			FileID = BitConverter.ToInt16(bytes, 4);
+			PageID = LittleEndian.ReadInt32(bytes, offset);
+			FileID = LittleEndian.ReadInt16(bytes, offset + 4);
 		}
 
 		public static bool operator ==(PagePointer a, PagePointer b)

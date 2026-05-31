@@ -32,20 +32,20 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		public LargeRootYukon(byte[] bytes, Database database)
 			: base(database)
 		{
-			short type = BitConverter.ToInt16(bytes, 8);
+			short type = LittleEndian.ReadInt16(bytes, 8);
 			if(type != (short)LobStructureType.LARGE_ROOT_YUKON)
 				throw new ArgumentException("Invalid byte structure. Expected LARGE_ROOT_YUKON, found " + type);
 			
-			BlobID = BitConverter.ToInt64(bytes, 0);
-			MaxLinks = BitConverter.ToInt16(bytes, 10);
-			CurLinks = BitConverter.ToInt16(bytes, 12);
-			Level = BitConverter.ToInt16(bytes, 14);
+			BlobID = LittleEndian.ReadInt64(bytes, 0);
+			MaxLinks = LittleEndian.ReadInt16(bytes, 10);
+			CurLinks = LittleEndian.ReadInt16(bytes, 12);
+			Level = LittleEndian.ReadInt16(bytes, 14);
 			DataSlotPointers = new LobSlotPointer[CurLinks];
 
 			short offset = 20;
 			for(short i=0; i<CurLinks; i++)
 			{
-				DataSlotPointers[i] = new LobSlotPointer(bytes.Skip(offset).Take(12).ToArray());
+				DataSlotPointers[i] = new LobSlotPointer(bytes, offset);
 				offset += 12;
 			}
 		}
@@ -56,8 +56,7 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 
 			foreach(var lobSlot in DataSlotPointers)
 			{
-				var textPage = Database.GetTextMixPage(lobSlot.PagePointer);
-				var lobRecord = textPage.Records[lobSlot.SlotID];
+				var lobRecord = Database.GetTextRecord(lobSlot);
 				var lobStructure = LobStructureFactory.Create(lobRecord.FixedLengthData, Database);
 
 				result.AddRange(lobStructure.GetData());

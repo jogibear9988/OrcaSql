@@ -23,7 +23,7 @@ namespace OrcaSql.Core.MetaData
         protected Row(ISchema schema)
 		{
 			Schema = schema;
-			data = new Dictionary<string, object>();
+			data = new Dictionary<string, object>(schema.Columns.Count);
 		}
 
 		private void EnsureColumnExists(string name)
@@ -86,6 +86,11 @@ namespace OrcaSql.Core.MetaData
 			get => this[col.Name];
             set => this[col.Name] = value;
         }
+
+		internal void SetValueUnchecked(DataColumn col, object value)
+		{
+			data[col.Name] = value;
+		}
 
 		public abstract Row NewRow();
 	}

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System;
 using OrcaSql.Core.Engine.Pages;
 using OrcaSql.Core.Engine.SqlTypes;
 using OrcaSql.Core.MetaData;
@@ -31,6 +32,21 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
         internal override IEnumerable<Row> GetEntities(DataExtractorHelper schema)
         {
+            var columns = schema.Columns.ToArray();
+            var nonSparseIndexes = new int[columns.Length];
+            var isDroppedColumn = new bool[columns.Length];
+            var sqlTypes = new ISqlType[columns.Length];
+
+            for (var i = 0; i < columns.Length; i++)
+            {
+                var col = columns[i];
+                nonSparseIndexes[i] = col.IsSparse ? -1 : schema.NonSparseIndexes[col.Name];
+                isDroppedColumn[i] = schema.IsDroppedColumn(col);
+
+                if (col.UnderlyingType != ColumnType.Bit)
+                    sqlTypes[i] = SqlTypeFactory.Create(col, null, compression);
+            }
+
             foreach (var record in page.Records)
             {
                 // Don't process forwarded blob fragments as they should only be processed from the referenced record
@@ -43,9 +59,10 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                 var readState = new RecordReadState(schema.BitColumnsCount);
                 var bitColumnBytes = new byte[0];
 
-                foreach (var col in schema.Columns)
+                for (var columnIndex = 0; columnIndex < columns.Length; columnIndex++)
                 {
-                    var sqlType = SqlTypeFactory.Create(col, readState, compression);
+                    var col = columns[columnIndex];
+                    var sqlType = sqlTypes[columnIndex] ?? SqlTypeFactory.Create(col, readState, compression);
                     object columnValue = null;
 
                     // Sparse columns needs to retrieve their values from the sparse vector, contained in the very last
@@ -62,7 +79,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                     }
                     else
                     {
-                        var nonSparseIndex = schema.NonSparseIndexes[col.Name];
+                        var nonSparseIndex = nonSparseIndexes[columnIndex];
                         // Before we even try to parse the column & make a null bitmap lookup, ensure that it's present in the record.
                         // There may be columns > record.NumberOfColumns caused by nullable columns added to the schema after the record was written.
                         if (nonSparseIndex < record.NumberOfColumns && col.UnderlyingType != ColumnType.Computed)
@@ -78,7 +95,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                                     {
                                         if (record.VariableLengthColumnData.TryGetValue(variableColumnIndex, out var proxy))
                                         {
-                                            var data = proxy.GetBytes()?.ToArray();
+                                            var data = proxy.GetBytes();
                                             columnValue = sqlType.GetValue(data ?? new byte[0]);
                                         }
                                         else
@@ -97,20 +114,27 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
                                 if ((!record.HasNullBitmap || !record.NullBitmap[nonSparseIndex]) && col.UnderlyingType != ColumnType.Bit)
                                 {
-                                    var valueBytes = record.FixedLengthData.Skip(fixedOffset).Take(fixedLength).ToArray();
-
                                     // We may run out of fixed length bytes. In certain conditions a null integer may have been added without
                                     // there being a null bitmap. In such a case, we detect the null condition by there not being enough fixed
                                     // length bytes to process.
-                                    if (valueBytes.Length == fixedLength || (compression.CompressionLevel != CompressionLevel.None && valueBytes.Length > 0))
+                                    if (TryReadFixedLengthValue(col, record.FixedLengthData, fixedOffset, fixedLength, compression, out var fastValue))
                                     {
-                                        columnValue = sqlType.GetValue(valueBytes);
+                                        columnValue = fastValue;
+                                    }
+                                    else
+                                    {
+                                        var valueBytes = ReadBytes(record.FixedLengthData, fixedOffset, fixedLength);
+
+                                        if (valueBytes.Length == fixedLength || (compression.CompressionLevel != CompressionLevel.None && valueBytes.Length > 0))
+                                        {
+                                            columnValue = sqlType.GetValue(valueBytes);
+                                        }
                                     }
                                 }
-                                else if(col.UnderlyingType == ColumnType.Bit && !schema.IsDroppedColumn(col))
+                                else if(col.UnderlyingType == ColumnType.Bit && !isDroppedColumn[columnIndex])
                                 {
                                     if (readState.IsFirstBit)
-                                        bitColumnBytes = record.FixedLengthData.Skip(fixedOffset).Take(fixedLength).ToArray();
+                                        bitColumnBytes = ReadBytes(record.FixedLengthData, fixedOffset, fixedLength);
 
                                     var value = sqlType.GetValue(bitColumnBytes);
                                     columnValue = !record.HasNullBitmap || !record.NullBitmap[nonSparseIndex] ? value : null;
@@ -129,8 +153,8 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                         }
                     }
 
-                    if(!schema.IsDroppedColumn(col))
-                        dataRow[col] = columnValue;
+                    if(!isDroppedColumn[columnIndex])
+                        dataRow.SetValueUnchecked(col, columnValue);
                 }
 
                 yield return dataRow;
@@ -138,5 +162,98 @@ namespace OrcaSql.Core.Engine.Records.Parsers
         }
 
         internal override PagePointer NextPage => page.Header.NextPage;
+
+        private static byte[] ReadBytes(byte[] source, int offset, int length)
+        {
+            if (length <= 0 || offset >= source.Length)
+                return new byte[0];
+
+            var available = Math.Min(length, source.Length - offset);
+            var result = new byte[available];
+            Buffer.BlockCopy(source, offset, result, 0, available);
+            return result;
+        }
+
+        private static bool TryReadFixedLengthValue(DataColumn col, byte[] source, int offset, int length,
+            CompressionContext compression, out object value)
+        {
+            value = null;
+
+            if (compression.CompressionLevel != CompressionLevel.None || offset + length > source.Length)
+                return false;
+
+            switch (col.UnderlyingType)
+            {
+                case ColumnType.BigInt:
+                    if (length != 8) return false;
+                    value = LittleEndian.ReadInt64(source, offset);
+                    return true;
+
+                case ColumnType.Int:
+                    if (length != 4) return false;
+                    value = LittleEndian.ReadInt32(source, offset);
+                    return true;
+
+                case ColumnType.SmallInt:
+                    if (length != 2) return false;
+                    value = LittleEndian.ReadInt16(source, offset);
+                    return true;
+
+                case ColumnType.TinyInt:
+                    if (length != 1) return false;
+                    value = source[offset];
+                    return true;
+
+                case ColumnType.DateTime:
+                    if (length != 8) return false;
+                    value = new DateTime(1900, 1, 1)
+                        .AddMilliseconds(LittleEndian.ReadInt32(source, offset) * (10d / 3d))
+                        .AddDays(LittleEndian.ReadInt32(source, offset + 4));
+                    return true;
+
+                case ColumnType.Date:
+                    if (length != 3) return false;
+                    value = DateTime.MinValue.AddDays(source[offset] + (source[offset + 1] << 8) + (source[offset + 2] << 16));
+                    return true;
+
+                case ColumnType.Money:
+                    if (length != 8) return false;
+                    value = LittleEndian.ReadInt64(source, offset) / 10000m;
+                    return true;
+
+                case ColumnType.SmallMoney:
+                    if (length != 4) return false;
+                    value = LittleEndian.ReadInt32(source, offset) / 10000m;
+                    return true;
+
+                case ColumnType.UniqueIdentifier:
+                    if (length != 16) return false;
+                    value = new Guid(
+                        LittleEndian.ReadInt32(source, offset),
+                        LittleEndian.ReadInt16(source, offset + 4),
+                        LittleEndian.ReadInt16(source, offset + 6),
+                        source[offset + 8],
+                        source[offset + 9],
+                        source[offset + 10],
+                        source[offset + 11],
+                        source[offset + 12],
+                        source[offset + 13],
+                        source[offset + 14],
+                        source[offset + 15]);
+                    return true;
+
+                case ColumnType.NChar:
+                    value = System.Text.Encoding.Unicode.GetString(source, offset, length);
+                    return true;
+
+                case ColumnType.Char:
+                    if (col.Encoding == null) return false;
+                    value = col.Encoding.GetString(source, offset, length);
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
     }
 }

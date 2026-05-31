@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace OrcaSql.Core.Engine.Records.VariableLengthDataProxies
 {
 	public class RawByteProxy : IVariableLengthDataProxy
@@ -11,7 +9,7 @@ namespace OrcaSql.Core.Engine.Records.VariableLengthDataProxies
 			this.data = data;
 		}
 
-		public IEnumerable<byte> GetBytes()
+		public byte[] GetBytes()
 		{
 			return data;
 		}

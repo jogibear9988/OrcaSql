@@ -18,13 +18,18 @@ namespace OrcaSql.Core.Engine
 		}
 
 		public SlotPointer(byte[] bytes)
+			: this(bytes, 0)
 		{
-			if (bytes.Length != 8)
+		}
+
+		public SlotPointer(byte[] bytes, int offset)
+		{
+			if (bytes.Length - offset < 8)
 				throw new ArgumentException("Input must be 8 bytes in the format pageID(4)fileID(2)slotID(2)");
 
-			PageID = BitConverter.ToInt32(bytes, 0);
-			FileID = BitConverter.ToInt16(bytes, 4);
-			SlotID = BitConverter.ToInt16(bytes, 6);
+			PageID = LittleEndian.ReadInt32(bytes, offset);
+			FileID = LittleEndian.ReadInt16(bytes, offset + 4);
+			SlotID = LittleEndian.ReadInt16(bytes, offset + 6);
 		}
 
 		public PagePointer PagePointer

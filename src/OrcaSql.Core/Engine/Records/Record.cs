@@ -21,14 +21,12 @@ namespace OrcaSql.Core.Engine.Records
 		public IDictionary<int, IVariableLengthDataProxy> VariableLengthColumnData { get; set; }
 
 		protected Page Page;
-		protected IDictionary<int, byte[]> RawVariableLengthColumnData { get; set; }
 
 		protected Record(Page page)
 		{
 			Page = page;
 
 			// Initialize variable length data dictionaries
-			RawVariableLengthColumnData = new Dictionary<int, byte[]>();
 			VariableLengthColumnData = new Dictionary<int, IVariableLengthDataProxy>();
 		}
 
@@ -39,14 +37,16 @@ namespace OrcaSql.Core.Engine.Records
 				NumberOfVariableLengthColumns = NumberOfColumns;
 			else
 			{
-				NumberOfVariableLengthColumns = BitConverter.ToInt16(bytes, offset);
+				NumberOfVariableLengthColumns = LittleEndian.ReadInt16(bytes, offset);
 				offset += 2;
 			}
+
+			VariableLengthColumnData = new Dictionary<int, IVariableLengthDataProxy>(NumberOfVariableLengthColumns);
 
 			short[] variableLengthColumnLengths = new short[NumberOfVariableLengthColumns];
 			for (int i = 0; i < NumberOfVariableLengthColumns; i++)
 			{
-				variableLengthColumnLengths[i] = BitConverter.ToInt16(bytes, offset);
+				variableLengthColumnLengths[i] = LittleEndian.ReadInt16(bytes, offset);
 				offset += 2;
 			}
 
@@ -62,7 +62,7 @@ namespace OrcaSql.Core.Engine.Records
 					complexColumn = true;
 				}
 
-				RawVariableLengthColumnData[i] = bytes.Skip(offset).Take(variableLengthColumnLengths[i] - offset).ToArray();
+				var rawData = CopyBytes(bytes, offset, variableLengthColumnLengths[i] - offset);
 				offset = variableLengthColumnLengths[i];
 
 				// Complex columns store special values and may need to be read elsewhere. In this case I'm using somewhat of a hack to detect
@@ -79,30 +79,30 @@ namespace OrcaSql.Core.Engine.Records
 				if (complexColumn)
 				{
 					// SQL Server 2000 text/image pointers are 24 bytes, Yukon+ pointers are 16 bytes.
-					if (RawVariableLengthColumnData[i].Length == 16 || RawVariableLengthColumnData[i].Length == 24)
-						VariableLengthColumnData[i] = new TextPointerProxy(Page, RawVariableLengthColumnData[i]);
+					if (rawData.Length == 16 || rawData.Length == 24)
+						VariableLengthColumnData[i] = new TextPointerProxy(Page, rawData);
 					else
 					{
-						short complexColumnID = RawVariableLengthColumnData[i][0];
+						short complexColumnID = rawData[0];
 
 						if (complexColumnID == 0)
-							complexColumnID = BitConverter.ToInt16(RawVariableLengthColumnData[i], 0);
+							complexColumnID = LittleEndian.ReadInt16(rawData, 0);
 
 						switch (complexColumnID)
 						{
 							// Row-overflow pointer, get referenced data
 							case 2:
-								VariableLengthColumnData[i] = new BlobInlineRootProxy(Page, RawVariableLengthColumnData[i]);
+								VariableLengthColumnData[i] = new BlobInlineRootProxy(Page, rawData);
 								break;
 
 							// BLOB Inline Root
 							case 4:
-								VariableLengthColumnData[i] = new BlobInlineRootProxy(Page, RawVariableLengthColumnData[i]);
+								VariableLengthColumnData[i] = new BlobInlineRootProxy(Page, rawData);
 								break;
 
 							// Sparse vectors will be processed at a later stage - no public option for accessing raw bytes
 							case 5:
-								SparseVector = new SparseVectorParser(RawVariableLengthColumnData[i]);
+								SparseVector = new SparseVectorParser(rawData);
 								break;
 
 							// Forwarded record back pointer (http://improve.dk/archive/2011/06/09/anatomy-of-a-forwarded-record-ndash-the-back-pointer.aspx)
@@ -114,20 +114,31 @@ namespace OrcaSql.Core.Engine.Records
 								break;
 
 							default:
-								throw new ArgumentException("Invalid complex column ID encountered: 0x" + BitConverter.ToInt16(RawVariableLengthColumnData[i], 0).ToString("X"));
+								throw new ArgumentException("Invalid complex column ID encountered: 0x" + LittleEndian.ReadInt16(rawData, 0).ToString("X"));
 						}
 					}
 				}
 				else
-					VariableLengthColumnData[i] = new RawByteProxy(RawVariableLengthColumnData[i]);
+					VariableLengthColumnData[i] = new RawByteProxy(rawData);
 			}
 		}
 
 		protected short ParseNullBitmap(byte[] bytes, ref short offset)
 		{
-			NullBitmap = new BitArray(bytes.Skip(offset).Take((NumberOfColumns + 7)/8).ToArray());
+			NullBitmap = new BitArray(CopyBytes(bytes, offset, (NumberOfColumns + 7)/8));
 			offset += (short)((NumberOfColumns + 7) / 8);
 			return offset;
+		}
+
+		protected static byte[] CopyBytes(byte[] source, int offset, int length)
+		{
+			if (length <= 0 || offset >= source.Length)
+				return new byte[0];
+
+			var available = Math.Min(length, source.Length - offset);
+			var result = new byte[available];
+			Buffer.BlockCopy(source, offset, result, 0, available);
+			return result;
 		}
 	}
 }

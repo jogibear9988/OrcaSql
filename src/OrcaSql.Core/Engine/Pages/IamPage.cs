@@ -64,30 +64,29 @@ namespace OrcaSql.Core.Engine.Pages
 			byte[] header = getIamHeaderRecordData();
 
 			// Read iam header
-			SequenceNumber = BitConverter.ToUInt32(header, 0);
-			Status = BitConverter.ToInt16(header, 14);
-			ObjectID = BitConverter.ToInt32(header, 28);
-			IndexID = BitConverter.ToInt16(header, 32);
+			SequenceNumber = LittleEndian.ReadUInt32(header, 0);
+			Status = LittleEndian.ReadInt16(header, 14);
+			ObjectID = LittleEndian.ReadInt32(header, 28);
+			IndexID = LittleEndian.ReadInt16(header, 32);
 			PageCount = header[34];
-			StartPage = new PagePointer(BitConverter.ToInt16(header, 40), BitConverter.ToInt32(header, 36));
+			StartPage = new PagePointer(LittleEndian.ReadInt16(header, 40), LittleEndian.ReadInt32(header, 36));
 
 			// Read single page slot allocations
-			Slot0 = new PagePointer(BitConverter.ToInt16(header, 46), BitConverter.ToInt32(header, 42));
-			Slot1 = new PagePointer(BitConverter.ToInt16(header, 52), BitConverter.ToInt32(header, 48));
-			Slot2 = new PagePointer(BitConverter.ToInt16(header, 58), BitConverter.ToInt32(header, 54));
-			Slot3 = new PagePointer(BitConverter.ToInt16(header, 64), BitConverter.ToInt32(header, 60));
-			Slot4 = new PagePointer(BitConverter.ToInt16(header, 70), BitConverter.ToInt32(header, 66));
-			Slot5 = new PagePointer(BitConverter.ToInt16(header, 76), BitConverter.ToInt32(header, 72));
-			Slot6 = new PagePointer(BitConverter.ToInt16(header, 82), BitConverter.ToInt32(header, 78));
-			Slot7 = new PagePointer(BitConverter.ToInt16(header, 88), BitConverter.ToInt32(header, 84));
+			Slot0 = new PagePointer(LittleEndian.ReadInt16(header, 46), LittleEndian.ReadInt32(header, 42));
+			Slot1 = new PagePointer(LittleEndian.ReadInt16(header, 52), LittleEndian.ReadInt32(header, 48));
+			Slot2 = new PagePointer(LittleEndian.ReadInt16(header, 58), LittleEndian.ReadInt32(header, 54));
+			Slot3 = new PagePointer(LittleEndian.ReadInt16(header, 64), LittleEndian.ReadInt32(header, 60));
+			Slot4 = new PagePointer(LittleEndian.ReadInt16(header, 70), LittleEndian.ReadInt32(header, 66));
+			Slot5 = new PagePointer(LittleEndian.ReadInt16(header, 76), LittleEndian.ReadInt32(header, 72));
+			Slot6 = new PagePointer(LittleEndian.ReadInt16(header, 82), LittleEndian.ReadInt32(header, 78));
+			Slot7 = new PagePointer(LittleEndian.ReadInt16(header, 88), LittleEndian.ReadInt32(header, 84));
 		}
 
 		private byte[] getIamHeaderRecordData()
 		{
-			var rawBytes = RawBytes.ToArray();
 			byte[] header;
 
-			if (tryGetFixedLengthRecordData(rawBytes, 96, out header) && header.Length >= 90)
+			if (tryGetFixedLengthRecordData(RawBytes, 96, out header) && header.Length >= 90)
 				return header;
 
 			header = Records
@@ -107,7 +106,7 @@ namespace OrcaSql.Core.Engine.Pages
 			if (bytes == null || offset < 0 || offset + 4 > bytes.Length)
 				return false;
 
-			var fixedLengthOffset = BitConverter.ToInt16(bytes, offset + 2);
+			var fixedLengthOffset = LittleEndian.ReadInt16(bytes, offset + 2);
 			if (fixedLengthOffset < 4 || offset + fixedLengthOffset > bytes.Length)
 				return false;
 

@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using OrcaSql.Core.Engine.Pages;
 using OrcaSql.Core.Engine.Pages.PFS;
+using OrcaSql.Core.Engine.Records;
 using OrcaSql.Core.MetaData;
 using OrcaSql.Core.MetaData.Exceptions;
 using OrcaSql.Core.MetaData.TableValuedDictionaries;
@@ -31,6 +32,8 @@ namespace OrcaSql.Core.Engine
         private readonly object metaDataLock = new object();
         private DatabaseMetaData metaData;
         private readonly BufferManager _bufferManager;
+        private readonly object _pfsPageCacheLock = new object();
+        private readonly Dictionary<long, PfsPage> _pfsPageCache = new Dictionary<long, PfsPage>();
         public string DefaultCollation { get; }
         public Encoding Encoding { get; set; }
 
@@ -198,6 +201,20 @@ namespace OrcaSql.Core.Engine
             return new TextMixPage(GetPageBytes(loc, false), this);
         }
 
+        internal TextRecord GetTextRecord(SlotPointer loc)
+        {
+            Debug.WriteLine("Loading Text Record " + loc);
+
+            var pageBytes = GetPageBytes(loc.PagePointer, false);
+            var header = new PageHeader(pageBytes, 0);
+
+            if (loc.SlotID < 0 || loc.SlotID >= header.SlotCnt)
+                throw new ArgumentOutOfRangeException(nameof(loc), "Slot is not present on the text page.");
+
+            var recordOffset = LittleEndian.ReadInt16(pageBytes, pageBytes.Length - loc.SlotID * 2 - 2);
+            return new TextRecord(pageBytes, recordOffset, null);
+        }
+
         [DebuggerStepThrough]
         internal IamPage GetIamPage(PagePointer loc, bool useCache)
         {
@@ -242,7 +259,18 @@ namespace OrcaSql.Core.Engine
             if (loc.PageID != 1 && loc.PageID % 8088 != 0)
                 throw new ArgumentException("Invalid PFS index: " + loc.PageID);
 
-            return new PfsPage(GetPageBytes(loc), this);
+            var key = ((long)(ushort)loc.FileID << 48) | loc.PageID;
+
+            lock (_pfsPageCacheLock)
+            {
+                if (!_pfsPageCache.TryGetValue(key, out var pfsPage))
+                {
+                    pfsPage = new PfsPage(GetPageBytes(loc), this);
+                    _pfsPageCache.Add(key, pfsPage);
+                }
+
+                return pfsPage;
+            }
         }
 
         public void Dispose()

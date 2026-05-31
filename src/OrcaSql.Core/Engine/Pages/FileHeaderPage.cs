@@ -28,8 +28,8 @@ namespace OrcaSql.Core.Engine.Pages
 				3-46						?
 			*/
 
-			BindingID = new Guid(record.VariableLengthColumnData[0].GetBytes().ToArray());
-			FileID = BitConverter.ToInt16(record.VariableLengthColumnData[2].GetBytes().ToArray(), 0);
+			BindingID = new Guid(record.VariableLengthColumnData[0].GetBytes());
+			FileID = BitConverter.ToInt16(record.VariableLengthColumnData[2].GetBytes(), 0);
 		}
 
 		public override string ToString()

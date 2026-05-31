@@ -1,4 +1,3 @@
-using System.Linq;
 using OrcaSql.Core.Engine.Records;
 using OrcaSql.Framework;
 
@@ -26,7 +25,7 @@ namespace OrcaSql.Core.Engine.Pages
             //                     select new { o1.i,o1.o, length = p?.o - o1.o };
             var idx = 0;
             foreach (var recordOffset in SlotArray)
-                Records[idx++] = new ClusteredIndexRecord(ArrayHelper.SliceArray(RawBytes.ToArray(), recordOffset, RawBytes.Count - recordOffset), this);
+                Records[idx++] = new ClusteredIndexRecord(ArrayHelper.SliceArray(RawBytes, recordOffset, RawBytes.Length - recordOffset), this);
         }
         /*
 		public IEnumerable<T> GetEntities<T>() where T : ClusteredTableIndexRow, new()
@@ -53,7 +52,7 @@ namespace OrcaSql.Core.Engine.Pages
 							if (record.VariableLengthColumnData.Count <= variableColumnIndex)
 								columnValue = sqlType.GetValue(new byte[] { });
 							else
-								columnValue = sqlType.GetValue(record.VariableLengthColumnData[variableColumnIndex].GetBytes().ToArray());
+								columnValue = sqlType.GetValue(record.VariableLengthColumnData[variableColumnIndex].GetBytes());
 						}
 
 						variableColumnIndex++;

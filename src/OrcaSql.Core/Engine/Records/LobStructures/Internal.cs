@@ -29,20 +29,20 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		public Internal(byte[] bytes, Database database)
 			: base(database)
 		{
-			short type = BitConverter.ToInt16(bytes, 8);
+			short type = LittleEndian.ReadInt16(bytes, 8);
 			if (type != (short)LobStructureType.INTERNAL)
 				throw new ArgumentException("Invalid byte structure. Expected INTERNAL, found " + type);
 
-			BlobID = BitConverter.ToInt64(bytes, 0);
-			MaxLinks = BitConverter.ToInt16(bytes, 10);
-			CurLinks = BitConverter.ToInt16(bytes, 12);
-			Level = BitConverter.ToInt16(bytes, 14);
+			BlobID = LittleEndian.ReadInt64(bytes, 0);
+			MaxLinks = LittleEndian.ReadInt16(bytes, 10);
+			CurLinks = LittleEndian.ReadInt16(bytes, 12);
+			Level = LittleEndian.ReadInt16(bytes, 14);
 			DataSlotPointers = new InternalLobSlotPointer[CurLinks];
 
 			short offset = 16;
 			for (short i = 0; i < CurLinks; i++)
 			{
-				DataSlotPointers[i] = new InternalLobSlotPointer(bytes.Skip(offset).Take(16).ToArray());
+				DataSlotPointers[i] = new InternalLobSlotPointer(bytes, offset);
 				offset += 16;
 			}
 		}
@@ -53,8 +53,7 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 
 			foreach (var lobSlot in DataSlotPointers)
 			{
-				var textPage = Database.GetTextMixPage(lobSlot.PagePointer);
-				var lobRecord = textPage.Records[lobSlot.SlotID];
+				var lobRecord = Database.GetTextRecord(lobSlot);
 				var lobStructure = LobStructureFactory.Create(lobRecord.FixedLengthData, Database);
 
 				result.AddRange(lobStructure.GetData());

@@ -10,9 +10,13 @@ namespace OrcaSql.Core.Engine
 {
 	public class DataScanner : Scanner
 	{
+		private readonly Dictionary<short, long> _filePageCounts;
+
 		public DataScanner(Database database)
 			: base(database)
-		{ }
+		{
+			_filePageCounts = database.Files.ToDictionary(x => x.Key, x => x.Value.Length / 8192);
+		}
 
 		/// <summary>
 		/// Will scan any table - heap or clustered - and return an IEnumerable of generic rows with data & schema
@@ -179,6 +183,8 @@ namespace OrcaSql.Core.Engine
 		private IEnumerable<Row> ScanHeap(PagePointer loc, DataExtractorHelper schema, CompressionContext compression,
             bool isSysTable)
 		{
+			var pfsPages = new Dictionary<long, PfsPage>();
+
 			// Traverse the linked list of IAM pages until the tail pointer is zero
 			while (loc != PagePointer.Zero)
 			{
@@ -186,7 +192,7 @@ namespace OrcaSql.Core.Engine
 					yield break;
 
 				// Before scanning, check that the IAM page itself is allocated
-				var pfsPage = Database.GetPfsPage(PfsPage.GetPfsPointerForPage(loc));
+				var pfsPage = GetPfsPage(PfsPage.GetPfsPointerForPage(loc), pfsPages);
 
 				// If IAM page isn't allocated, there's nothing to return
 				if (!pfsPage.GetPageDescription(loc.PageID).IsAllocated)
@@ -211,11 +217,12 @@ namespace OrcaSql.Core.Engine
 				foreach (var slot in iamPageSlots.Where(x => x != PagePointer.Zero && PageExists(x)))
 				{
 					// Skip non-Data pages (e.g. Index pages in system table allocation units)
-					var slotPageHeader = new Pages.PageHeader(Database.GetPageBytes(slot, isSysTable).Take(96).ToArray());
+					var slotPageBytes = Database.GetPageBytes(slot, isSysTable);
+					var slotPageHeader = new Pages.PageHeader(slotPageBytes, 0);
 					if (slotPageHeader.Type != Pages.PageType.Data)
 						continue;
 
-					var recordParser = RecordEntityParser.CreateEntityParserForPage(slot, compression, Database, isSysTable);
+					var recordParser = RecordEntityParser.CreateEntityParserForPage(slot, slotPageBytes, compression, Database);
 
 					foreach (var dr in recordParser.GetEntities(schema))
 						yield return dr;
@@ -225,7 +232,7 @@ namespace OrcaSql.Core.Engine
 				foreach (var extent in iamPage.GetAllocatedExtents().Where(extent => PageExists(extent.StartPage)))
 				{
 					// Get PFS page that tracks this extent
-					var pfs = Database.GetPfsPage(PfsPage.GetPfsPointerForPage(extent.StartPage));
+					var pfs = GetPfsPage(PfsPage.GetPfsPointerForPage(extent.StartPage), pfsPages);
 
 					foreach (var pageLoc in extent.GetPagePointers())
 					{
@@ -239,11 +246,12 @@ namespace OrcaSql.Core.Engine
 							continue;
 
 						// Skip non-Data pages (e.g. Index pages in system table allocation units)
-						var pageHeader = new Pages.PageHeader(Database.GetPageBytes(pageLoc, !isSysTable).Take(96).ToArray());
+						var pageBytes = Database.GetPageBytes(pageLoc, !isSysTable);
+						var pageHeader = new Pages.PageHeader(pageBytes, 0);
 						if (pageHeader.Type != Pages.PageType.Data)
 							continue;
 
-						var recordParser = RecordEntityParser.CreateEntityParserForPage(pageLoc, compression, Database, isSysTable);
+						var recordParser = RecordEntityParser.CreateEntityParserForPage(pageLoc, pageBytes, compression, Database);
 
 						foreach (var dr in recordParser.GetEntities(schema))
 							yield return dr;
@@ -263,7 +271,20 @@ namespace OrcaSql.Core.Engine
 			if (!Database.Files.TryGetValue(page.FileID, out var file))
 				return false;
 
-			return page.PageID < file.Length / 8192;
+			return page.PageID < _filePageCounts[page.FileID];
+		}
+
+		private PfsPage GetPfsPage(PagePointer loc, IDictionary<long, PfsPage> pfsPages)
+		{
+			var key = ((long)(ushort)loc.FileID << 48) | loc.PageID;
+
+			if (!pfsPages.TryGetValue(key, out var pfsPage))
+			{
+				pfsPage = Database.GetPfsPage(loc);
+				pfsPages.Add(key, pfsPage);
+			}
+
+			return pfsPage;
 		}
     }
 }

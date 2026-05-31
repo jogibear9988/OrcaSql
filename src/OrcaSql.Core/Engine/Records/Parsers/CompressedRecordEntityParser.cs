@@ -33,7 +33,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 					if (dataProxy == null)
 						dataRow[col] = null;
 					else
-						dataRow[col] = sqlType.GetValue(dataProxy.GetBytes().ToArray());
+						dataRow.SetValueUnchecked(col, sqlType.GetValue(dataProxy.GetBytes()));
 
 					columnIndex++;
 				}

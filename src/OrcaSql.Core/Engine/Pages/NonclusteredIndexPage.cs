@@ -14,19 +14,30 @@ namespace OrcaSql.Core.Engine.Pages
 
 		internal IEnumerable<Row> GetEntities(Row schema, CompressionContext compression)
 		{
+			var columns = schema.Columns.ToArray();
+			var sqlTypes = new ISqlType[columns.Length];
+			var bitColumnsCount = columns.Count(x => x.UnderlyingType == ColumnType.Bit);
+
+			for (var columnIndex = 0; columnIndex < columns.Length; columnIndex++)
+			{
+				var col = columns[columnIndex];
+				if (col.UnderlyingType != ColumnType.Bit)
+					sqlTypes[columnIndex] = SqlTypeFactory.Create(col, null, compression);
+			}
+
 			for (int i = 0; i < Records.Length; i++)
 			{
 				var record = Records[i];
 
 				short fixedOffset = 0;
 				short variableColumnIndex = 0;
-				int columnIndex = 0;
-				var readState = new RecordReadState(schema.Columns.Count(x => x.UnderlyingType == ColumnType.Bit));
+				var readState = new RecordReadState(bitColumnsCount);
 				var dataRow = schema.NewRow();
 
-				foreach (DataColumn col in dataRow.Columns)
+				for (var columnIndex = 0; columnIndex < columns.Length; columnIndex++)
 				{
-					var sqlType = SqlTypeFactory.Create(col, readState, compression);
+					var col = columns[columnIndex];
+					var sqlType = sqlTypes[columnIndex] ?? SqlTypeFactory.Create(col, readState, compression);
 					object columnValue = null;
 
 					if (sqlType.IsVariableLength)
@@ -37,7 +48,7 @@ namespace OrcaSql.Core.Engine.Pages
 							if (record.VariableLengthColumnData.Count <= variableColumnIndex)
 								columnValue = sqlType.GetValue(new byte[] { });
 							else
-								columnValue = sqlType.GetValue(record.VariableLengthColumnData[variableColumnIndex].GetBytes().ToArray());
+								columnValue = sqlType.GetValue(record.VariableLengthColumnData[variableColumnIndex].GetBytes());
 						}
 
 						variableColumnIndex++;
@@ -53,8 +64,7 @@ namespace OrcaSql.Core.Engine.Pages
 						fixedOffset += fixedLength;
 					}
 
-					columnIndex++;
-					dataRow[col] = columnValue;
+					dataRow.SetValueUnchecked(col, columnValue);
 				}
 
 				yield return dataRow;

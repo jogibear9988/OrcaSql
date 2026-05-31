@@ -26,9 +26,14 @@ namespace OrcaSql.Core.Engine.Pages
 		public PagePointer Pointer { get; private set; }
 
 		public PageHeader(byte[] header)
+			: this(header, 0)
 		{
-			if (header.Length != 96)
-				throw new ArgumentException("Header length must be 96.");
+		}
+
+		public PageHeader(byte[] header, int offset)
+		{
+			if (header.Length - offset < 96)
+				throw new ArgumentException("Header length must be at least 96 bytes from the provided offset.");
 
 			/*
 				Bytes	Content
@@ -62,25 +67,25 @@ namespace OrcaSql.Core.Engine.Pages
 				64-95	?
 			*/
 
-			HeaderVersion = header[0];
-			Type = (PageType)header[1];
-			TypeFlagBits = header[2];
-			Level = header[3];
-			FlagBits = BitConverter.ToInt16(header, 4);
-			IndexID = BitConverter.ToInt16(header, 6);
-			PreviousPage = new PagePointer(BitConverter.ToInt16(header, 12), BitConverter.ToInt32(header, 8));
-			Pminlen = BitConverter.ToInt16(header, 14);
-			NextPage = new PagePointer(BitConverter.ToInt16(header, 20), BitConverter.ToInt32(header, 16));
-			SlotCnt = BitConverter.ToInt16(header, 22);
-			ObjectID = BitConverter.ToInt32(header, 24);
-			FreeCnt = BitConverter.ToInt16(header, 28);
-			FreeData = BitConverter.ToInt16(header, 30);
-			Pointer = new PagePointer(BitConverter.ToInt16(header, 36), BitConverter.ToInt32(header, 32));
-			ReservedCnt = BitConverter.ToInt16(header, 38);
-			Lsn = "(" + BitConverter.ToInt32(header, 40) + ":" + BitConverter.ToInt32(header, 44) + ":" + BitConverter.ToInt16(header, 48) + ")";
-			XactReserved = BitConverter.ToInt16(header, 50);
-			XdesID = "(" + BitConverter.ToInt16(header, 56) + ":" + BitConverter.ToInt32(header, 52) + ")";
-			GhostRecCnt = BitConverter.ToInt16(header, 58);
+			HeaderVersion = header[offset];
+			Type = (PageType)header[offset + 1];
+			TypeFlagBits = header[offset + 2];
+			Level = header[offset + 3];
+			FlagBits = LittleEndian.ReadInt16(header, offset + 4);
+			IndexID = LittleEndian.ReadInt16(header, offset + 6);
+			PreviousPage = new PagePointer(LittleEndian.ReadInt16(header, offset + 12), LittleEndian.ReadInt32(header, offset + 8));
+			Pminlen = LittleEndian.ReadInt16(header, offset + 14);
+			NextPage = new PagePointer(LittleEndian.ReadInt16(header, offset + 20), LittleEndian.ReadInt32(header, offset + 16));
+			SlotCnt = LittleEndian.ReadInt16(header, offset + 22);
+			ObjectID = LittleEndian.ReadInt32(header, offset + 24);
+			FreeCnt = LittleEndian.ReadInt16(header, offset + 28);
+			FreeData = LittleEndian.ReadInt16(header, offset + 30);
+			Pointer = new PagePointer(LittleEndian.ReadInt16(header, offset + 36), LittleEndian.ReadInt32(header, offset + 32));
+			ReservedCnt = LittleEndian.ReadInt16(header, offset + 38);
+			Lsn = "(" + LittleEndian.ReadInt32(header, offset + 40) + ":" + LittleEndian.ReadInt32(header, offset + 44) + ":" + LittleEndian.ReadInt16(header, offset + 48) + ")";
+			XactReserved = LittleEndian.ReadInt16(header, offset + 50);
+			XdesID = "(" + LittleEndian.ReadInt16(header, offset + 56) + ":" + LittleEndian.ReadInt32(header, offset + 52) + ")";
+			GhostRecCnt = LittleEndian.ReadInt16(header, offset + 58);
 		}
 
 		public override string ToString()
