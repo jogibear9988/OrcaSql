@@ -26,14 +26,14 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		public Null(byte[] bytes, Database database)
 			: base(database)
 		{
-			short type = BitConverter.ToInt16(bytes, 8);
+			short type = LittleEndian.ReadInt16(bytes, 8);
 			if (type != (short)LobStructureType.NULL)
 				throw new ArgumentException("Invalid byte structure. Expected NULL, found " + type);
 
-			BlobID = BitConverter.ToInt64(bytes, 0);
-			MaxLinks = BitConverter.ToInt16(bytes, 10);
-			CurLinks = BitConverter.ToInt16(bytes, 12);
-			Level = BitConverter.ToInt16(bytes, 14);
+			BlobID = LittleEndian.ReadInt64(bytes, 0);
+			MaxLinks = LittleEndian.ReadInt16(bytes, 10);
+			CurLinks = LittleEndian.ReadInt16(bytes, 12);
+			Level = LittleEndian.ReadInt16(bytes, 14);
 		}
 
 		public byte[] GetData()

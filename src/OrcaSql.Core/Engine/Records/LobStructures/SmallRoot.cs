@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 
 namespace OrcaSql.Core.Engine.Records.LobStructures
 {
@@ -22,13 +21,15 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		public SmallRoot(byte[] bytes, Database database)
 			: base(database)
 		{
-			short type = BitConverter.ToInt16(bytes, 8);
+			short type = LittleEndian.ReadInt16(bytes, 8);
 			if(type != (short)LobStructureType.SMALL_ROOT)
 				throw new ArgumentException("Invalid byte structure. Expected SMALL_ROOT, found " + type);
 			
-			BlobID = BitConverter.ToInt64(bytes, 0);
-			Length = BitConverter.ToInt16(bytes, 10);
-			data = bytes.Skip(16).Take(Length).ToArray();
+			BlobID = LittleEndian.ReadInt64(bytes, 0);
+			Length = LittleEndian.ReadInt16(bytes, 10);
+			data = Length <= 0 ? Array.Empty<byte>() : new byte[Length];
+			if (Length > 0)
+				Buffer.BlockCopy(bytes, 16, data, 0, Length);
 		}
 
 		public byte[] GetData()

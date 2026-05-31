@@ -4,6 +4,8 @@ using System.Linq;
 using OrcaSql.Core.Engine.Pages.PFS;
 using OrcaSql.Core.Engine.Records.Parsers;
 using OrcaSql.Core.MetaData;
+using OrcaSql.Core.MetaData.BaseTables;
+using OrcaSql.Core.MetaData.DMVs;
 using OrcaSql.Core.MetaData.Enumerations;
 
 namespace OrcaSql.Core.Engine
@@ -11,6 +13,13 @@ namespace OrcaSql.Core.Engine
 	public class DataScanner : Scanner
 	{
 		private readonly Dictionary<short, long> _filePageCounts;
+		private Dictionary<string, sysschobj> _tableObjectsByName;
+		private Dictionary<int, Partition[]> _partitionsByObjectId;
+		private Dictionary<long, Partition> _partitionsById;
+		private Dictionary<long, SystemInternalsAllocationUnit> _inRowAllocationUnitsByContainerId;
+		private Dictionary<int, MetaData.DMVs.Index> _clusteredIndexesByObjectId;
+		private Dictionary<long, SystemInternalsPartitionColumn[]> _partitionColumnsByPartitionId;
+		private Dictionary<int, SysDefaultConstraint[]> _defaultConstraintsByParentObjectId;
 
 		public DataScanner(Database database)
 			: base(database)
@@ -88,20 +97,19 @@ namespace OrcaSql.Core.Engine
 		private IEnumerable<Row> ScanTable(string tableName, Row schema, bool isSysTable = true)
 		{
 			// Get object
-			var tableObject = Database.BaseTables.SysSchObjs
-				.Where(x => x.name == tableName)
-				.SingleOrDefault(x => x.type.Trim() == ObjectType.INTERNAL_TABLE || x.type.Trim() == ObjectType.SYSTEM_TABLE || x.type.Trim() == ObjectType.USER_TABLE);
+			var tableObjects = GetTableObjectsByName();
+			tableObjects.TryGetValue(tableName, out var tableObject);
 
 			if (tableObject == null)
 				throw new ArgumentException("Table does not exist.");
 
 			// Get rowset, prefer clustered index if exists
-			var partitions = Database.Dmvs.Partitions
-				.Where(x => x.ObjectID == tableObject.id && x.IndexID <= 1)
-				.OrderBy(x => x.PartitionNumber)
-                .ToArray();
+			var partitionsByObjectId = GetPartitionsByObjectId();
+			var partitions = partitionsByObjectId.TryGetValue(tableObject.id, out var objectPartitions)
+				? objectPartitions
+				: Array.Empty<Partition>();
 
-			if (!partitions.Any())
+			if (partitions.Length == 0)
 				return Enumerable.Empty<Row>();
 
 			// Loop all partitions and return results one by one
@@ -111,15 +119,15 @@ namespace OrcaSql.Core.Engine
 		private IEnumerable<Row> ScanPartition(long partitionID, int partitionNumber, Row schema, bool isSysTable = true)
 		{
 			// Lookup partition
-			var partition = Database.Dmvs.Partitions
-				.SingleOrDefault(p => p.PartitionID == partitionID && p.PartitionNumber == partitionNumber);
+			var partitionsById = GetPartitionsById();
+			partitionsById.TryGetValue(partitionID, out var partition);
 
-			if(partition == null)
+			if(partition == null || partition.PartitionNumber != partitionNumber)
 				throw new ArgumentException("Partition (" + partitionID + "." + partitionNumber + " does not exist.");
 
 			// Get allocation unit for in-row data
-			var au = Database.Dmvs.SystemInternalsAllocationUnits
-				.SingleOrDefault(x => x.ContainerID == partition.PartitionID && x.Type == 1);
+			var allocationUnits = GetInRowAllocationUnitsByContainerId();
+			allocationUnits.TryGetValue(partition.PartitionID, out var au);
 
 			if (au == null)
 				throw new ArgumentException("Partition (" + partition.PartitionID + "." + partition.PartitionNumber + " has no HOBT allocation unit.");
@@ -128,13 +136,19 @@ namespace OrcaSql.Core.Engine
 			// We also need to know whether the partition is using vardecimals.
 			var compression = new CompressionContext((CompressionLevel)partition.DataCompression, MetaData.PartitionHasVardecimalColumns(partition.PartitionID));
 
-            var clusteredIndex = isSysTable ? null : Database.Dmvs.Indexes.SingleOrDefault(x => x.ObjectID == partition.ObjectID && x.Type == 1);
+            var clusteredIndex = isSysTable
+                ? null
+                : GetClusteredIndexesByObjectId().TryGetValue(partition.ObjectID, out var index) ? index : null;
 
             var useClusteredIndex = isSysTable || clusteredIndex != null;
 
-            var partitionColumns = isSysTable || Database.UsesLegacyPartitionMetadata ? null : Database.Dmvs.SystemInternalsPartitionColumns.Where(x => x.PartitionID == partition.PartitionID).ToArray();
+            var partitionColumns = isSysTable || Database.UsesLegacyPartitionMetadata
+                ? null
+                : GetPartitionColumnsByPartitionId().TryGetValue(partition.PartitionID, out var columns) ? columns : Array.Empty<SystemInternalsPartitionColumn>();
 
-            var defaultConstraints = isSysTable || Database.UsesLegacyPartitionMetadata ? null : Database.Dmvs.SysDefaultConstraints.Where(x => x.ParentObjectId == partition.ObjectID).ToArray();
+            var defaultConstraints = isSysTable || Database.UsesLegacyPartitionMetadata
+                ? null
+                : GetDefaultConstraintsByParentObjectId().TryGetValue(partition.ObjectID, out var constraints) ? constraints : Array.Empty<SysDefaultConstraint>();
 
             var schemaWrapper = new DataExtractorHelper(schema, Database.Dmvs, null, partitionColumns, defaultConstraints);
 
@@ -285,6 +299,57 @@ namespace OrcaSql.Core.Engine
 			}
 
 			return pfsPage;
+		}
+
+		private Dictionary<string, sysschobj> GetTableObjectsByName()
+		{
+			return _tableObjectsByName ?? (_tableObjectsByName = Database.BaseTables.SysSchObjs
+				.Where(x => x.type.Trim() == ObjectType.INTERNAL_TABLE || x.type.Trim() == ObjectType.SYSTEM_TABLE || x.type.Trim() == ObjectType.USER_TABLE)
+				.GroupBy(x => x.name)
+				.ToDictionary(x => x.Key, x => x.First()));
+		}
+
+		private Dictionary<int, Partition[]> GetPartitionsByObjectId()
+		{
+			return _partitionsByObjectId ?? (_partitionsByObjectId = Database.Dmvs.Partitions
+				.Where(x => x.IndexID <= 1)
+				.GroupBy(x => x.ObjectID)
+				.ToDictionary(x => x.Key, x => x.OrderBy(p => p.PartitionNumber).ToArray()));
+		}
+
+		private Dictionary<long, Partition> GetPartitionsById()
+		{
+			return _partitionsById ?? (_partitionsById = Database.Dmvs.Partitions.ToDictionary(x => x.PartitionID));
+		}
+
+		private Dictionary<long, SystemInternalsAllocationUnit> GetInRowAllocationUnitsByContainerId()
+		{
+			return _inRowAllocationUnitsByContainerId ?? (_inRowAllocationUnitsByContainerId = Database.Dmvs.SystemInternalsAllocationUnits
+				.Where(x => x.Type == 1)
+				.GroupBy(x => x.ContainerID)
+				.ToDictionary(x => x.Key, x => x.First()));
+		}
+
+		private Dictionary<int, MetaData.DMVs.Index> GetClusteredIndexesByObjectId()
+		{
+			return _clusteredIndexesByObjectId ?? (_clusteredIndexesByObjectId = Database.Dmvs.Indexes
+				.Where(x => x.Type == 1)
+				.GroupBy(x => x.ObjectID)
+				.ToDictionary(x => x.Key, x => x.First()));
+		}
+
+		private Dictionary<long, SystemInternalsPartitionColumn[]> GetPartitionColumnsByPartitionId()
+		{
+			return _partitionColumnsByPartitionId ?? (_partitionColumnsByPartitionId = Database.Dmvs.SystemInternalsPartitionColumns
+				.GroupBy(x => x.PartitionID)
+				.ToDictionary(x => x.Key, x => x.ToArray()));
+		}
+
+		private Dictionary<int, SysDefaultConstraint[]> GetDefaultConstraintsByParentObjectId()
+		{
+			return _defaultConstraintsByParentObjectId ?? (_defaultConstraintsByParentObjectId = Database.Dmvs.SysDefaultConstraints
+				.GroupBy(x => x.ParentObjectId)
+				.ToDictionary(x => x.Key, x => x.ToArray()));
 		}
     }
 }

@@ -9,20 +9,26 @@ namespace OrcaSql.Core.Engine.Records
 		public bool IsGhostForwardedRecord { get; private set; }
 
 		public PrimaryRecord(byte[] bytes, Page page)
+			: this(bytes, 0, bytes.Length, page)
+		{
+		}
+
+		public PrimaryRecord(byte[] bytes, int recordStart, int recordLength, Page page)
 			: base(page)
 		{
 			short offset = 0;
+			var recordEnd = Math.Min(bytes.Length, recordStart + recordLength);
 
 			// Parse status bits A
-			parseStatusBitsA(bytes[offset++]);
+			parseStatusBitsA(bytes[recordStart + offset++]);
 
 			if (SkipDataParsing(Type))
 			{
-				if (bytes.Length > offset)
-					parseStatusBitsB(bytes[offset++]);
+				if (recordEnd > recordStart + offset)
+					parseStatusBitsB(bytes[recordStart + offset++]);
 
-				FixedLengthData = new byte[0];
-				RawBytes = CopyBytes(bytes, 0, offset);
+				FixedLengthData = Array.Empty<byte>();
+				RawBytes = CopyBytes(bytes, recordStart, offset);
 				return;
 			}
 
@@ -30,23 +36,23 @@ namespace OrcaSql.Core.Engine.Records
 			if(Type == RecordType.ForwardingStub)
 			{
 				// Forwarding stub only has one status byte. Remaining 8 bytes are for (PageID, FileID, Slot)
-				FixedLengthData = CopyBytes(bytes, 1, 8);
+				FixedLengthData = CopyBytes(bytes, recordStart + 1, 8);
 
 				if (FixedLengthData.Length < 8)
 				{
 					IsGhostForwardedRecord = true;
-					RawBytes = bytes;
+					RawBytes = CopyBytes(bytes, recordStart, Math.Min(recordEnd - recordStart, 9));
 					return;
 				}
 				
-				int pageID = LittleEndian.ReadInt32(bytes, 1);
-				short fileID = LittleEndian.ReadInt16(bytes, 5);
-				short slot = LittleEndian.ReadInt16(bytes, 7);
+				int pageID = LittleEndian.ReadInt32(bytes, recordStart + 1);
+				short fileID = LittleEndian.ReadInt16(bytes, recordStart + 5);
+				short slot = LittleEndian.ReadInt16(bytes, recordStart + 7);
 
 				if (fileID <= 0 || pageID <= 0 || slot < 0 || page?.Database == null || !page.Database.Files.ContainsKey(fileID))
 				{
 					IsGhostForwardedRecord = true;
-					RawBytes = CopyBytes(bytes, 0, 9);
+					RawBytes = CopyBytes(bytes, recordStart, 9);
 					return;
 				}
 
@@ -62,6 +68,8 @@ namespace OrcaSql.Core.Engine.Records
 
 				parseStatusBitsA(forwardedRecordBytes[0]);
 				bytes = forwardedRecordBytes;
+				recordStart = 0;
+				recordEnd = bytes.Length;
 
 				// We'll impersonate the ForwardingStub record type that we originated from, this allows
 				// the engine to distinguish BlobFragments and the records that actually reference them.
@@ -69,15 +77,15 @@ namespace OrcaSql.Core.Engine.Records
 			}
 
 			// Parse status bits B
-			parseStatusBitsB(bytes[offset++]);
+			parseStatusBitsB(bytes[recordStart + offset++]);
 
 			// Parse fixed length size
-			short fixedLengthOffset = LittleEndian.ReadInt16(bytes, offset);
-			if (fixedLengthOffset < 4 || fixedLengthOffset + 2 > bytes.Length)
+			short fixedLengthOffset = LittleEndian.ReadInt16(bytes, recordStart + offset);
+			if (fixedLengthOffset < 4 || recordStart + fixedLengthOffset + 2 > recordEnd)
 			{
 				IsGhostForwardedRecord = true;
-				FixedLengthData = new byte[0];
-				RawBytes = CopyBytes(bytes, 0, offset + 2);
+				FixedLengthData = Array.Empty<byte>();
+				RawBytes = CopyBytes(bytes, recordStart, offset + 2);
 				return;
 			}
 
@@ -85,22 +93,22 @@ namespace OrcaSql.Core.Engine.Records
 			offset += 2;
 
 			// Parse fixed length data
-			FixedLengthData = CopyBytes(bytes, offset, fixedLengthSize);
+			FixedLengthData = CopyBytes(bytes, recordStart + offset, fixedLengthSize);
 			offset += fixedLengthSize;
 
 			// Parse number of columns
-			NumberOfColumns = LittleEndian.ReadInt16(bytes, offset);
+			NumberOfColumns = LittleEndian.ReadInt16(bytes, recordStart + offset);
 			offset += 2;
 
 			try
 			{
 				// Parse null bitmap, if present
 				if (HasNullBitmap)
-					offset = ParseNullBitmap(bytes, ref offset);
+					offset = ParseNullBitmap(bytes, recordStart, ref offset);
 
 				// Parse variable length columns, if present
 				if (HasVariableLengthColumns)
-					ParseVariableLengthColumns(bytes, ref offset);
+					ParseVariableLengthColumns(bytes, recordStart, ref offset);
 			}
 			catch (Exception ex) when (ex is ArgumentOutOfRangeException
 			                           || ex is IndexOutOfRangeException
@@ -108,13 +116,13 @@ namespace OrcaSql.Core.Engine.Records
 			                           || ex is ArgumentException)
 			{
 				IsGhostForwardedRecord = true;
-				FixedLengthData = new byte[0];
-				RawBytes = CopyBytes(bytes, 0, Math.Min(bytes.Length, offset));
+				FixedLengthData = Array.Empty<byte>();
+				RawBytes = CopyBytes(bytes, recordStart, Math.Min(recordEnd - recordStart, offset));
 				return;
 			}
 
 			// Save complete record raw bytes
-			RawBytes = CopyBytes(bytes, 0, offset);
+			RawBytes = CopyBytes(bytes, recordStart, offset);
 		}
 
 		private void parseStatusBitsA(byte bits)

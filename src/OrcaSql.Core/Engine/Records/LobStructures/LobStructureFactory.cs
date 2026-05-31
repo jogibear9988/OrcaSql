@@ -8,7 +8,7 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		public static ILobStructure Create(byte[] bytes, Database database)
 		{
 			// Type is stored in bytes 8-9 on all known lob structures
-			short type = BitConverter.ToInt16(bytes, 8);
+			short type = LittleEndian.ReadInt16(bytes, 8);
 			LobStructureType lobType;
 
 			if (Enum.IsDefined(typeof(LobStructureType), type))

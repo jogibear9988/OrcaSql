@@ -2,6 +2,7 @@
 using System.Linq;
 using System;
 using OrcaSql.Core.Engine.Pages;
+using OrcaSql.Core.Engine.Records.VariableLengthDataProxies;
 using OrcaSql.Core.Engine.SqlTypes;
 using OrcaSql.Core.MetaData;
 
@@ -57,7 +58,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                 short variableColumnIndex = 0;
                 var dataRow = schema.NewRow();
                 var readState = new RecordReadState(schema.BitColumnsCount);
-                var bitColumnBytes = new byte[0];
+                var bitColumnBytes = Array.Empty<byte>();
 
                 for (var columnIndex = 0; columnIndex < columns.Length; columnIndex++)
                 {
@@ -95,14 +96,19 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                                     {
                                         if (record.VariableLengthColumnData.TryGetValue(variableColumnIndex, out var proxy))
                                         {
-                                            var data = proxy.GetBytes();
-                                            columnValue = sqlType.GetValue(data ?? new byte[0]);
+                                            if (TryReadVariableLengthValue(col, proxy, out var fastValue))
+                                                columnValue = fastValue;
+                                            else
+                                            {
+                                                var data = proxy.GetBytes();
+                                                columnValue = sqlType.GetValue(data ?? Array.Empty<byte>());
+                                            }
                                         }
                                         else
-                                            columnValue = sqlType.GetValue(new byte[0]);
+                                            columnValue = sqlType.GetValue(Array.Empty<byte>());
                                     }
                                     else
-                                        columnValue = sqlType.GetValue(new byte[0]);
+                                        columnValue = sqlType.GetValue(Array.Empty<byte>());
                                 }
 
                                 variableColumnIndex++;
@@ -166,7 +172,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
         private static byte[] ReadBytes(byte[] source, int offset, int length)
         {
             if (length <= 0 || offset >= source.Length)
-                return new byte[0];
+                return Array.Empty<byte>();
 
             var available = Math.Min(length, source.Length - offset);
             var result = new byte[available];
@@ -256,6 +262,30 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                 case ColumnType.Char:
                     if (col.Encoding == null) return false;
                     value = col.Encoding.GetString(source, offset, length);
+                    return true;
+
+                default:
+                return false;
+            }
+        }
+
+        private static bool TryReadVariableLengthValue(DataColumn col, IVariableLengthDataProxy proxy, out object value)
+        {
+            value = null;
+
+            var raw = proxy as RawByteProxy;
+            if (raw == null)
+                return false;
+
+            switch (col.UnderlyingType)
+            {
+                case ColumnType.NVarchar:
+                    value = System.Text.Encoding.Unicode.GetString(raw.Source, raw.Offset, raw.Length);
+                    return true;
+
+                case ColumnType.Varchar:
+                    if (col.Encoding == null) return false;
+                    value = col.Encoding.GetString(raw.Source, raw.Offset, raw.Length);
                     return true;
 
                 default:

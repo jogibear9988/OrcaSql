@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 
 namespace OrcaSql.Core.Engine.Records.LobStructures
 {
@@ -20,12 +19,15 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 		public Data(byte[] bytes, Database database)
 			: base(database)
 		{
-			short type = BitConverter.ToInt16(bytes, 8);
+			short type = LittleEndian.ReadInt16(bytes, 8);
 			if (type != (short)LobStructureType.DATA)
 				throw new ArgumentException("Invalid byte structure. Expected DATA, found " + type);
 
-			BlobID = BitConverter.ToInt64(bytes, 0);
-			data = bytes.Skip(10).ToArray();
+			BlobID = LittleEndian.ReadInt64(bytes, 0);
+			var length = bytes.Length - 10;
+			data = length <= 0 ? Array.Empty<byte>() : new byte[length];
+			if (length > 0)
+				Buffer.BlockCopy(bytes, 10, data, 0, length);
 		}
 
 		public byte[] GetData()

@@ -24,10 +24,10 @@ namespace OrcaSql.Core.Engine.Records
 			offset += 2;
 
 			if (HasNullBitmap)
-				offset = ParseNullBitmap(bytes, ref offset);
+				offset = ParseNullBitmap(bytes, 0, ref offset);
 
 			if (HasVariableLengthColumns)
-				ParseVariableLengthColumns(bytes, ref offset);
+				ParseVariableLengthColumns(bytes, 0, ref offset);
 		}
 
         public PagePointer PageId { get; set; }

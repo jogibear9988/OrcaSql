@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using OrcaSql.Core.Engine.Pages;
 using OrcaSql.Core.Engine.Records.LobStructures;
 
@@ -32,24 +31,28 @@ namespace OrcaSql.Core.Engine.Records.VariableLengthDataProxies
 
 		public byte[] GetBytes()
 		{
-			var fieldData = new List<byte>();
-
-			for (int i = 12; i < data.Length; i += 12)
+			using (var fieldData = new MemoryStream())
 			{
-				int length = LittleEndian.ReadInt32(data, i);
-				int pageID = LittleEndian.ReadInt32(data, i + 4);
-				short fileID = LittleEndian.ReadInt16(data, i + 8);
-				short slot = LittleEndian.ReadInt16(data, i + 10);
+				for (int i = 12; i < data.Length; i += 12)
+				{
+					int length = LittleEndian.ReadInt32(data, i);
+					int pageID = LittleEndian.ReadInt32(data, i + 4);
+					short fileID = LittleEndian.ReadInt16(data, i + 8);
+					short slot = LittleEndian.ReadInt16(data, i + 10);
 
-				// Get referenced page data
-				var referencedData = OriginPage.Database.GetTextRecord(new SlotPointer(fileID, pageID, slot)).FixedLengthData;
+					// Get referenced page data
+					var referencedData = OriginPage.Database.GetTextRecord(new SlotPointer(fileID, pageID, slot)).FixedLengthData;
 
-				// Get lob structure and retrieve data
-				var lobStructure = LobStructureFactory.Create(referencedData, OriginPage.Database);
-				fieldData.AddRange(lobStructure.GetData());
+					// Get lob structure and retrieve data
+					var lobStructure = LobStructureFactory.Create(referencedData, OriginPage.Database);
+					var bytes = lobStructure.GetData();
+
+					if (bytes != null && bytes.Length > 0)
+						fieldData.Write(bytes, 0, bytes.Length);
+				}
+
+				return fieldData.ToArray();
 			}
-
-			return fieldData.ToArray();
 		}
 	}
 }

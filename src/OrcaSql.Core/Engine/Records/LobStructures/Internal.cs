@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 
 namespace OrcaSql.Core.Engine.Records.LobStructures
 {
@@ -49,17 +48,20 @@ namespace OrcaSql.Core.Engine.Records.LobStructures
 
 		public byte[] GetData()
 		{
-			var result = new List<byte>();
-
-			foreach (var lobSlot in DataSlotPointers)
+			using (var result = new MemoryStream())
 			{
-				var lobRecord = Database.GetTextRecord(lobSlot);
-				var lobStructure = LobStructureFactory.Create(lobRecord.FixedLengthData, Database);
+				foreach (var lobSlot in DataSlotPointers)
+				{
+					var lobRecord = Database.GetTextRecord(lobSlot);
+					var lobStructure = LobStructureFactory.Create(lobRecord.FixedLengthData, Database);
+					var data = lobStructure.GetData();
 
-				result.AddRange(lobStructure.GetData());
+					if (data != null && data.Length > 0)
+						result.Write(data, 0, data.Length);
+				}
+
+				return result.ToArray();
 			}
-
-			return result.ToArray();
 		}
 	}
 }
