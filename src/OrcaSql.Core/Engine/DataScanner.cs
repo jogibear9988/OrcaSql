@@ -102,7 +102,7 @@ namespace OrcaSql.Core.Engine
                 .ToArray();
 
 			if (!partitions.Any())
-				throw new ArgumentException("Table has no partitions.");
+				return Enumerable.Empty<Row>();
 
 			// Loop all partitions and return results one by one
 			return partitions.SelectMany(partition => ScanPartition(partition.PartitionID, partition.PartitionNumber, schema, isSysTable));

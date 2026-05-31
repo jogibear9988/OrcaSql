@@ -127,7 +127,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
                                         if (valueBytes.Length == fixedLength || (compression.CompressionLevel != CompressionLevel.None && valueBytes.Length > 0))
                                         {
-                                            columnValue = sqlType.GetValue(valueBytes);
+                                            columnValue = GetFixedLengthValue(col, sqlType, valueBytes);
                                         }
                                     }
                                 }
@@ -206,9 +206,16 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
                 case ColumnType.DateTime:
                     if (length != 8) return false;
-                    value = new DateTime(1900, 1, 1)
-                        .AddMilliseconds(LittleEndian.ReadInt32(source, offset) * (10d / 3d))
-                        .AddDays(LittleEndian.ReadInt32(source, offset + 4));
+                    try
+                    {
+                        value = new DateTime(1900, 1, 1)
+                            .AddMilliseconds(LittleEndian.ReadInt32(source, offset) * (10d / 3d))
+                            .AddDays(LittleEndian.ReadInt32(source, offset + 4));
+                    }
+                    catch (ArgumentOutOfRangeException) when (col.IsNullable)
+                    {
+                        value = null;
+                    }
                     return true;
 
                 case ColumnType.Date:
@@ -253,6 +260,18 @@ namespace OrcaSql.Core.Engine.Records.Parsers
 
                 default:
                     return false;
+            }
+        }
+
+        private static object GetFixedLengthValue(DataColumn col, ISqlType sqlType, byte[] valueBytes)
+        {
+            try
+            {
+                return sqlType.GetValue(valueBytes);
+            }
+            catch (ArgumentOutOfRangeException) when (col.IsNullable && col.UnderlyingType == ColumnType.DateTime)
+            {
+                return null;
             }
         }
     }
