@@ -44,3 +44,36 @@ Verification:
 dotnet build src\OrcaSql.Core\OrcaSql.Core.csproj -c Release
 dotnet test OrcaSql.slnx -c Release --no-restore
 ```
+
+## Row, null-bitmap, variable-column, and lazy LOB optimization
+
+The next pass targeted per-row and per-record overhead that remained after page-buffer parsing:
+
+- `Row` stores values in an ordinal `object[]` instead of a per-row `Dictionary<string, object>`, while preserving the existing name-based indexer and `Field<T>` API;
+- `Schema` caches column ordinals and exposes a stable `ReadOnlyCollection<DataColumn>` instead of creating one on each access;
+- variable-length record data is stored in an array instead of a per-record dictionary;
+- record null bitmap checks use raw bitmap bytes instead of `BitArray`;
+- `ISqlType` now exposes a span-shaped parsing entry point, and raw string values continue to decode directly from page-buffer slices without intermediate `byte[]` copies on the current `netstandard2.0` target;
+- `DataScanner` reuses empty schema rows and partition-specific extractor helpers;
+- `DataScanner.LoadLobData` can be set to `false` to return LOB proxies for off-row `image`/`text`/`ntext` data instead of materializing payloads during the scan.
+
+Observed all-table scan timings after this pass:
+
+```text
+Full LOB loading:
+877 ms, 749 ms, 802 ms, 554 ms, 388 ms, 384 ms
+
+LoadLobData = false:
+200 ms
+```
+
+Compared with the previous documented pass, the last-three-run full-LOB scan moved from about 469 ms to about 442 ms, and the lazy LOB mode provides a much faster path for callers that only need row metadata or can defer LOB reads.
+
+Hot-table allocation changes compared with the previous documented pass:
+
+```text
+HmiTextTable:              128.97 MB -> 120.07 MB
+HmiLogFilePropertiesTable: 207.15 MB -> 199.69 MB
+HmiBasicTable:              45.30 MB ->  31.70 MB
+HmiAddressTable:            15.29 MB ->  14.77 MB
+```

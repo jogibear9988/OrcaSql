@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using OrcaSql.Core.Engine.Pages;
 using OrcaSql.Core.Engine.Records.VariableLengthDataProxies;
 
@@ -14,11 +11,11 @@ namespace OrcaSql.Core.Engine.Records
 		public bool HasVariableLengthColumns { get; protected set; }
 		public byte[] FixedLengthData { get; protected set; }
 		public short NumberOfColumns { get; protected set; }
-		public BitArray NullBitmap { get; protected set; }
+		private byte[] nullBitmapBytes;
 		public short NumberOfVariableLengthColumns { get; protected set; }
 		public byte[] RawBytes { get; protected set; }
 		public SparseVectorParser SparseVector { get; private set; }
-		public IDictionary<int, IVariableLengthDataProxy> VariableLengthColumnData { get; set; }
+		public IVariableLengthDataProxy[] VariableLengthColumnData { get; set; }
 
 		protected Page Page;
 
@@ -26,8 +23,7 @@ namespace OrcaSql.Core.Engine.Records
 		{
 			Page = page;
 
-			// Initialize variable length data dictionaries
-			VariableLengthColumnData = new Dictionary<int, IVariableLengthDataProxy>();
+			VariableLengthColumnData = Array.Empty<IVariableLengthDataProxy>();
 		}
 
 		protected void ParseVariableLengthColumns(byte[] bytes, int recordStart, ref short offset)
@@ -41,7 +37,7 @@ namespace OrcaSql.Core.Engine.Records
 				offset += 2;
 			}
 
-			VariableLengthColumnData = new Dictionary<int, IVariableLengthDataProxy>(NumberOfVariableLengthColumns);
+			VariableLengthColumnData = new IVariableLengthDataProxy[NumberOfVariableLengthColumns];
 
 			short[] variableLengthColumnLengths = new short[NumberOfVariableLengthColumns];
 			for (int i = 0; i < NumberOfVariableLengthColumns; i++)
@@ -133,9 +129,30 @@ namespace OrcaSql.Core.Engine.Records
 
 		protected short ParseNullBitmap(byte[] bytes, int recordStart, ref short offset)
 		{
-			NullBitmap = new BitArray(CopyBytes(bytes, recordStart + offset, (NumberOfColumns + 7)/8));
-			offset += (short)((NumberOfColumns + 7) / 8);
+			var length = (NumberOfColumns + 7) / 8;
+			nullBitmapBytes = CopyBytes(bytes, recordStart + offset, length);
+			offset += (short)length;
 			return offset;
+		}
+
+		public bool IsNull(int columnIndex)
+		{
+			return nullBitmapBytes != null
+			       && columnIndex >= 0
+			       && columnIndex / 8 < nullBitmapBytes.Length
+			       && (nullBitmapBytes[columnIndex / 8] & (1 << (columnIndex % 8))) != 0;
+		}
+
+		public bool TryGetVariableLengthColumnData(int index, out IVariableLengthDataProxy proxy)
+		{
+			if (index >= 0 && index < VariableLengthColumnData.Length)
+			{
+				proxy = VariableLengthColumnData[index];
+				return proxy != null;
+			}
+
+			proxy = null;
+			return false;
 		}
 
 		protected static byte[] CopyBytes(byte[] source, int offset, int length)

@@ -17,6 +17,7 @@ namespace OrcaSql.Core.MetaData
 		public bool IsIncluded;
 		public bool IsVariableLength;
 		public bool IsSparse;
+		internal int Ordinal = -1;
 
         public DataColumn(string name, string type)
 			: this(name, type, false)

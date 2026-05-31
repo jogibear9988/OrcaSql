@@ -11,8 +11,9 @@ namespace OrcaSql.Core.MetaData
         private readonly Dictionary<int, SysDefaultConstraint> _defaultConstraints;
         private readonly Dictionary<int, object> _cachedDefaultValues;
 
-        private DataExtractorHelper(IReadOnlyCollection<DataColumn> sourceColumns, DmvGenerator dmvGenerator, SystemInternalsPartitionColumn[] partitionColumns, SysDefaultConstraint[] defaultConstraints)
+        private DataExtractorHelper(IReadOnlyCollection<DataColumn> sourceColumns, DmvGenerator dmvGenerator, SystemInternalsPartitionColumn[] partitionColumns, SysDefaultConstraint[] defaultConstraints, bool loadLobData)
         {
+            LoadLobData = loadLobData;
             _cachedDefaultValues = new Dictionary<int, object>();
             var newOrderedColumns = new List<DataColumn>();
             var columns = sourceColumns.ToList();
@@ -56,13 +57,15 @@ namespace OrcaSql.Core.MetaData
 
         public Dictionary<string, int> NonSparseIndexes { get; }
 
+        public bool LoadLobData { get; }
+
         public DataExtractorHelper(Row dataRow, DmvGenerator dmvGenerator, IndexColumn[] clusteredIndexColumns,
-            SystemInternalsPartitionColumn[] partitionColumns, SysDefaultConstraint[] defaultConstraints) : this(dataRow.Columns, dmvGenerator, partitionColumns, defaultConstraints)
+            SystemInternalsPartitionColumn[] partitionColumns, SysDefaultConstraint[] defaultConstraints, bool loadLobData = true) : this(dataRow.Columns, dmvGenerator, partitionColumns, defaultConstraints, loadLobData)
         {
             this._dataRow = dataRow;
         }
 
-        public DataExtractorHelper(Row dataRow) : this(dataRow.Columns, null, null, null)
+        public DataExtractorHelper(Row dataRow) : this(dataRow.Columns, null, null, null, true)
         {
             this._dataRow = dataRow;
         }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace OrcaSql.Core.MetaData
@@ -10,26 +9,33 @@ namespace OrcaSql.Core.MetaData
 	public abstract class Row
 	{
 		protected ISchema Schema;
-		
-		protected IDictionary<string, object> data;
+		private object[] values;
 
 		public ReadOnlyCollection<DataColumn> Columns => Schema.Columns;
 
         protected Row()
         {
-            data = new Dictionary<string, object>();
         }
 
         protected Row(ISchema schema)
 		{
 			Schema = schema;
-			data = new Dictionary<string, object>(schema.Columns.Count);
+			values = new object[schema.Columns.Count];
 		}
 
-		private void EnsureColumnExists(string name)
+		private int GetOrdinal(string name)
 		{
-			if(!Schema.HasColumn(name))
+			if(Schema == null || !Schema.TryGetOrdinal(name, out var ordinal))
 				throw new ArgumentOutOfRangeException("Column '" + name + "' does not exist.");
+
+			EnsureValueStorage();
+			return ordinal;
+		}
+
+		private void EnsureValueStorage()
+		{
+			if (values == null && Schema != null)
+				values = new object[Schema.Columns.Count];
 		}
 
 		public T Field<T>(DataColumn col)
@@ -39,7 +45,8 @@ namespace OrcaSql.Core.MetaData
 
 		public T Field<T>(string name)
 		{
-			EnsureColumnExists(name);
+			var ordinal = GetOrdinal(name);
+			var value = values[ordinal];
 
 			// We need to handle nullables explicitly
 			var t = typeof (T);
@@ -47,37 +54,24 @@ namespace OrcaSql.Core.MetaData
 			
 			if(u != null)
 			{
-				if (!data.ContainsKey(name) || data[name] == null)
+				if (value == null)
 					return default(T);
 
-				return (T)Convert.ChangeType(data[name], u);
+				return (T)Convert.ChangeType(value, u);
 			}
 
-			// This is ugly, but fast as columns will practically always be present.
-			// Exceptions are... The exception.
-			try
-			{
-				return (T)Convert.ChangeType(data[name], t);
-			}
-			catch (KeyNotFoundException)
-			{
-				return (T)Convert.ChangeType(null, t);
-			}
+			return (T)Convert.ChangeType(value, t);
 		}
 
 		public object this[string name]
 		{
 			get
 			{
-				EnsureColumnExists(name);
-
-				return data.TryGetValue(name, out var value) ? value : null;
+				return values[GetOrdinal(name)];
             }
 			set
 			{
-				EnsureColumnExists(name);
-
-				data[name] = value;
+				values[GetOrdinal(name)] = value;
 			}
 		}
 
@@ -89,7 +83,13 @@ namespace OrcaSql.Core.MetaData
 
 		internal void SetValueUnchecked(DataColumn col, object value)
 		{
-			data[col.Name] = value;
+			var ordinal = col.Ordinal;
+			if (ordinal < 0 || ordinal >= Schema.Columns.Count || Schema.Columns[ordinal].Name != col.Name)
+				ordinal = GetOrdinal(col.Name);
+			else
+				EnsureValueStorage();
+
+			values[ordinal] = value;
 		}
 
 		public abstract Row NewRow();

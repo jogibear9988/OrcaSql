@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using OrcaSql.Core.MetaData.DMVs;
 using OrcaSql.Framework.SCSU;
@@ -31,6 +32,11 @@ namespace OrcaSql.Core.Engine.SqlTypes
 			{
 				return Encoding.Unicode.GetString(value);
 			}
+		}
+
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			return GetValue(value.ToArray());
 		}
 
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)

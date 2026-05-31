@@ -88,15 +88,15 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                             if (sqlType.IsVariableLength)
                             {
                                 // If there's either no null bitmap, or the null bitmap defines the column as non-null.
-                                if (!record.HasNullBitmap || !record.NullBitmap[nonSparseIndex])
+                                if (!record.HasNullBitmap || !record.IsNull(nonSparseIndex))
                                 {
                                     // If the current variable length column index exceeds the number of stored
                                     // variable length columns, the value is empty by definition (that is, 0 bytes, but not null).
                                     if (variableColumnIndex < record.NumberOfVariableLengthColumns)
                                     {
-                                        if (record.VariableLengthColumnData.TryGetValue(variableColumnIndex, out var proxy))
+                                        if (record.TryGetVariableLengthColumnData(variableColumnIndex, out var proxy))
                                         {
-                                            if (TryReadVariableLengthValue(col, proxy, out var fastValue))
+                                            if (TryReadVariableLengthValue(col, sqlType, proxy, schema.LoadLobData, out var fastValue))
                                                 columnValue = fastValue;
                                             else
                                             {
@@ -118,7 +118,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                                 // Must cache type FixedLength as it may change after getting a value (e.g. SqlBit)
                                 var fixedLength = sqlType.FixedLength.Value;
 
-                                if ((!record.HasNullBitmap || !record.NullBitmap[nonSparseIndex]) && col.UnderlyingType != ColumnType.Bit)
+                                if ((!record.HasNullBitmap || !record.IsNull(nonSparseIndex)) && col.UnderlyingType != ColumnType.Bit)
                                 {
                                     // We may run out of fixed length bytes. In certain conditions a null integer may have been added without
                                     // there being a null bitmap. In such a case, we detect the null condition by there not being enough fixed
@@ -143,7 +143,7 @@ namespace OrcaSql.Core.Engine.Records.Parsers
                                         bitColumnBytes = ReadBytes(record.FixedLengthData, fixedOffset, fixedLength);
 
                                     var value = sqlType.GetValue(bitColumnBytes);
-                                    columnValue = !record.HasNullBitmap || !record.NullBitmap[nonSparseIndex] ? value : null;
+                                    columnValue = !record.HasNullBitmap || !record.IsNull(nonSparseIndex) ? value : null;
                                 }
 
                                 fixedOffset += fixedLength;
@@ -269,27 +269,49 @@ namespace OrcaSql.Core.Engine.Records.Parsers
             }
         }
 
-        private static bool TryReadVariableLengthValue(DataColumn col, IVariableLengthDataProxy proxy, out object value)
+        private static bool TryReadVariableLengthValue(DataColumn col, ISqlType sqlType, IVariableLengthDataProxy proxy, bool loadLobData, out object value)
         {
             value = null;
 
             var raw = proxy as RawByteProxy;
-            if (raw == null)
-                return false;
-
-            switch (col.UnderlyingType)
+            if (raw != null)
             {
-                case ColumnType.NVarchar:
-                    value = System.Text.Encoding.Unicode.GetString(raw.Source, raw.Offset, raw.Length);
-                    return true;
+                switch (col.UnderlyingType)
+                {
+                    case ColumnType.NVarchar:
+                        value = System.Text.Encoding.Unicode.GetString(raw.Source, raw.Offset, raw.Length);
+                        return true;
 
-                case ColumnType.Varchar:
-                    if (col.Encoding == null) return false;
-                    value = col.Encoding.GetString(raw.Source, raw.Offset, raw.Length);
-                    return true;
+                    case ColumnType.Varchar:
+                        if (col.Encoding == null) return false;
+                        value = col.Encoding.GetString(raw.Source, raw.Offset, raw.Length);
+                        return true;
 
+                    default:
+                        value = sqlType.GetValue(new ReadOnlySpan<byte>(raw.Source, raw.Offset, raw.Length));
+                        return true;
+                }
+            }
+
+            if (!loadLobData && IsLobType(col))
+            {
+                value = proxy;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsLobType(DataColumn col)
+        {
+            switch (col.Type)
+            {
+                case ColumnType.Image:
+                case ColumnType.Text:
+                case ColumnType.NText:
+                    return true;
                 default:
-                    return false;
+                    return col.UnderlyingType == ColumnType.VarBinary && col.VariableFixedLength == -1;
             }
         }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using OrcaSql.Core.MetaData.DMVs;
 
@@ -20,6 +21,11 @@ namespace OrcaSql.Core.Engine.SqlTypes
         public override object GetValue(byte[] value)
 		{
 			return _encoding.GetString(value);
+		}
+
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			return GetValue(value.ToArray());
 		}
 
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)

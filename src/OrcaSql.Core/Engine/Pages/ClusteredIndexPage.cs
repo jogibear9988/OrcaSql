@@ -46,10 +46,10 @@ namespace OrcaSql.Core.Engine.Pages
 
 					if (sqlType.IsVariableLength)
 					{
-						if (!record.HasNullBitmap || !record.NullBitmap[columnIndex])
+						if (!record.HasNullBitmap || !record.IsNull(columnIndex))
 						{
 							// If a nullable varlength column does not have a value, it may be not even appear in the varlength column array if it's at the tail
-							if (record.VariableLengthColumnData.Count <= variableColumnIndex)
+							if (record.VariableLengthColumnData.Length <= variableColumnIndex)
 								columnValue = sqlType.GetValue(new byte[] { });
 							else
 								columnValue = sqlType.GetValue(record.VariableLengthColumnData[variableColumnIndex].GetBytes());
@@ -62,7 +62,7 @@ namespace OrcaSql.Core.Engine.Pages
 						// Must cache type FixedLength as it may change after getting a value (e.g. SqlBit)
 						short fixedLength = sqlType.FixedLength.Value;
 
-						if (!record.HasNullBitmap || !record.NullBitmap[columnIndex])
+						if (!record.HasNullBitmap || !record.IsNull(columnIndex))
 							columnValue = sqlType.GetValue(record.FixedLengthData.Skip(fixedOffset).Take(fixedLength).ToArray());
 
 						fixedOffset += fixedLength;

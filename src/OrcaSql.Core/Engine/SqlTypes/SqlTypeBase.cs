@@ -1,4 +1,5 @@
-﻿using OrcaSql.Core.MetaData.DMVs;
+using System;
+using OrcaSql.Core.MetaData.DMVs;
 
 namespace OrcaSql.Core.Engine.SqlTypes
 {
@@ -14,6 +15,11 @@ namespace OrcaSql.Core.Engine.SqlTypes
 		public abstract bool IsVariableLength { get; }
 		public abstract short? FixedLength { get; }
 		public abstract object GetValue(byte[] value);
+		public virtual object GetValue(ReadOnlySpan<byte> value)
+		{
+			return GetValue(value.ToArray());
+		}
+
         public abstract object GetDefaultValue(SysDefaultConstraint columnConstraint);
     }
 }

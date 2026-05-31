@@ -6,5 +6,6 @@ namespace OrcaSql.Core.MetaData
 	{
 		ReadOnlyCollection<DataColumn> Columns { get; }
 		bool HasColumn(string name);
+		bool TryGetOrdinal(string name, out int ordinal);
 	}
 }

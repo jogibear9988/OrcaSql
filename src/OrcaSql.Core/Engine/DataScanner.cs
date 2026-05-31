@@ -20,6 +20,8 @@ namespace OrcaSql.Core.Engine
 		private Dictionary<int, MetaData.DMVs.Index> _clusteredIndexesByObjectId;
 		private Dictionary<long, SystemInternalsPartitionColumn[]> _partitionColumnsByPartitionId;
 		private Dictionary<int, SysDefaultConstraint[]> _defaultConstraintsByParentObjectId;
+		private readonly Dictionary<string, DataRow> _emptyDataRows = new Dictionary<string, DataRow>();
+		private readonly Dictionary<string, DataExtractorHelper> _schemaWrappers = new Dictionary<string, DataExtractorHelper>();
 
 		public DataScanner(Database database)
 			: base(database)
@@ -27,19 +29,26 @@ namespace OrcaSql.Core.Engine
 			_filePageCounts = database.Files.ToDictionary(x => x.Key, x => x.Value.Length / 8192);
 		}
 
+		public bool LoadLobData { get; set; } = true;
+
 		/// <summary>
 		/// Will scan any table - heap or clustered - and return an IEnumerable of generic rows with data & schema
 		/// </summary>
 		public IEnumerable<Row> ScanTable(string tableName, int? schemaId = null, bool isSysTable = true)
 		{
-			var schema = MetaData.GetEmptyDataRow(tableName, schemaId);
+			var schema = GetEmptyDataRow(tableName, schemaId);
 
 			return ScanTable(tableName, schema, isSysTable);
 		}
 
         public DataRow GetEmptyDataRow(string tableName, int? schemaId = null)
         {
-            var schema = MetaData.GetEmptyDataRow(tableName, schemaId);
+            var key = tableName + ":" + (schemaId.HasValue ? schemaId.Value.ToString() : "");
+            if (!_emptyDataRows.TryGetValue(key, out var schema))
+            {
+                schema = MetaData.GetEmptyDataRow(tableName, schemaId);
+                _emptyDataRows.Add(key, schema);
+            }
 
             return schema;
         }
@@ -150,7 +159,7 @@ namespace OrcaSql.Core.Engine
                 ? null
                 : GetDefaultConstraintsByParentObjectId().TryGetValue(partition.ObjectID, out var constraints) ? constraints : Array.Empty<SysDefaultConstraint>();
 
-            var schemaWrapper = new DataExtractorHelper(schema, Database.Dmvs, null, partitionColumns, defaultConstraints);
+            var schemaWrapper = GetSchemaWrapper(partition.PartitionID, schema, partitionColumns, defaultConstraints);
 
             // For system tables and SQL Server 2000 tables, use IAM-based scanning since
             // pgfirst/root pointers can become stale or use older index layouts.
@@ -350,6 +359,19 @@ namespace OrcaSql.Core.Engine
 			return _defaultConstraintsByParentObjectId ?? (_defaultConstraintsByParentObjectId = Database.Dmvs.SysDefaultConstraints
 				.GroupBy(x => x.ParentObjectId)
 				.ToDictionary(x => x.Key, x => x.ToArray()));
+		}
+
+		private DataExtractorHelper GetSchemaWrapper(long partitionId, Row schema,
+            SystemInternalsPartitionColumn[] partitionColumns, SysDefaultConstraint[] defaultConstraints)
+		{
+			var key = partitionId + ":" + LoadLobData + ":" + schema.GetType().FullName;
+			if (!_schemaWrappers.TryGetValue(key, out var schemaWrapper))
+			{
+				schemaWrapper = new DataExtractorHelper(schema, Database.Dmvs, null, partitionColumns, defaultConstraints, LoadLobData);
+				_schemaWrappers.Add(key, schemaWrapper);
+			}
+
+			return schemaWrapper;
 		}
     }
 }
