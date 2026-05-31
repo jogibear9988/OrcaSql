@@ -34,6 +34,14 @@ namespace OrcaSql.Core.Engine.SqlTypes
 			
 		}
 
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			if (value.Length != FixedLength.Value)
+				throw new ArgumentException("Invalid value length: " + value.Length);
+
+			return value.Length == 4 ? (object)LittleEndian.ReadSingle(value) : LittleEndian.ReadDouble(value);
+		}
+
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)
         {
             return float.TryParse(columnConstraint.Definition.Trim('(', ')'), out var parsedResult) ? parsedResult : (object)null;

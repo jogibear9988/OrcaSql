@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Linq;
 using OrcaSql.Core.Engine.Pages;
 using OrcaSql.Core.Engine.Records.VariableLengthDataProxies;
-using OrcaSql.Framework;
 
 namespace OrcaSql.Core.Engine.Records.Compression
 {
 	internal class CompressedRecord
 	{
+		private static readonly byte[] TrueBitBytes = { 1 };
 		internal CompressedRecordFormat RecordFormat { get; private set; }
 		internal bool HasVersioningInformation { get; private set; }
 		internal CompressedRecordType RecordType { get; private set; }
@@ -15,6 +14,7 @@ namespace OrcaSql.Core.Engine.Records.Compression
 
 		private readonly Page page;
 		private readonly byte[] record;
+		private readonly int recordStart;
 		private bool containsLongDataRegion;
 		private CompressedRecordColumnCDIndicator[] columnValueIndicators;
 		private short[] shortDataRegionClusterPointers;
@@ -22,8 +22,14 @@ namespace OrcaSql.Core.Engine.Records.Compression
 		private short[] longDataColumnLengths;
 
 		internal CompressedRecord(byte[] record, Page page)
+			: this(record, 0, record.Length, page)
+		{
+		}
+
+		internal CompressedRecord(byte[] record, int recordStart, int recordLength, Page page)
 		{
 			this.record = record;
+			this.recordStart = recordStart;
 			this.page = page;
 
 			short recordPointer = 1;
@@ -54,11 +60,11 @@ namespace OrcaSql.Core.Engine.Records.Compression
 
 			// If it's a true bit, 
 			if (colDescription == CompressedRecordColumnCDIndicator.TrueBit)
-				return new RawByteProxy(new byte[] { 1 });
+				return new RawByteProxy(TrueBitBytes);
 
 			// If it's zero-length
 			if (colDescription == CompressedRecordColumnCDIndicator.ZeroByte)
-				return new RawByteProxy(new byte[0]);
+				return new RawByteProxy(Array.Empty<byte>());
 
 			// Is the data long or short?
 			if (colDescription == CompressedRecordColumnCDIndicator.LongData)
@@ -73,39 +79,39 @@ namespace OrcaSql.Core.Engine.Records.Compression
 				if ((longDataColumnLengths[longIndex] & 32768) > 0)
 				{
 					short actualLength = (short)(longDataColumnLengths[longIndex] & 32767);
-					byte[] data = ArrayHelper.SliceArray(record, longDataColumnPointers[longIndex], actualLength);
+					var dataOffset = recordStart + longDataColumnPointers[longIndex];
 
 					// For length 16 we know it'll be a text pointer
 					if (actualLength == 16)
-						return new TextPointerProxy(page, data);
+						return new TextPointerProxy(page, CopyBytes(record, dataOffset, actualLength));
 
 					// For other lengths we'll have to determine the type of complex column.
 					// TODO: https://github.com/improvedk/OrcaMDF/issues/2
-					short complexColumnID = data[0];
+					short complexColumnID = record[dataOffset];
 
 					if (complexColumnID == 0)
-						complexColumnID = BitConverter.ToInt16(data, 0);
+						complexColumnID = LittleEndian.ReadInt16(record, dataOffset);
 
 					switch (complexColumnID)
 					{
 						// Row-overflow pointer, get referenced data
 						case 2:
-							return new BlobInlineRootProxy(page, data);
+							return new BlobInlineRootProxy(page, CopyBytes(record, dataOffset, actualLength));
 
 						// BLOB Inline Root
 						case 4:
-							return new BlobInlineRootProxy(page, data);
+							return new BlobInlineRootProxy(page, CopyBytes(record, dataOffset, actualLength));
 
 						// Back pointer
 						case 1024:
-							return new RawByteProxy(data);
+							return new RawByteProxy(record, dataOffset, actualLength);
 
 						default:
-							throw new ArgumentException("Invalid complex column ID encountered: 0x" + BitConverter.ToInt16(data, 0).ToString("X"));
+							throw new ArgumentException("Invalid complex column ID encountered: 0x" + LittleEndian.ReadInt16(record, dataOffset).ToString("X"));
 					}
 				}
 				else
-					return new RawByteProxy(ArrayHelper.SliceArray(record, longDataColumnPointers[longIndex], longDataColumnLengths[longIndex]));
+					return new RawByteProxy(record, recordStart + longDataColumnPointers[longIndex], longDataColumnLengths[longIndex]);
 			}
 			else
 			{
@@ -119,7 +125,7 @@ namespace OrcaSql.Core.Engine.Records.Compression
 						recordPointer += getLengthFromColumnIndicator(columnValueIndicators[i]);
 
 				// Return the column value
-				return new RawByteProxy(ArrayHelper.SliceArray(record, recordPointer, getLengthFromColumnIndicator(colDescription)));
+				return new RawByteProxy(record, recordStart + recordPointer, getLengthFromColumnIndicator(colDescription));
 			}
 		}
 
@@ -156,7 +162,7 @@ namespace OrcaSql.Core.Engine.Records.Compression
 
 		private void parseHeader()
 		{
-			byte header = record[0];
+			byte header = record[recordStart];
 
 			// Bit 0
 			RecordFormat = (header & 0x1) > 0 ? CompressedRecordFormat.CD : CompressedRecordFormat.Unknown;
@@ -177,20 +183,20 @@ namespace OrcaSql.Core.Engine.Records.Compression
 		{
 			// If the high order bit of the first byte is set, numColumns is a two-byte value,
 			// otherwise it's a one-byte value.
-			byte firstByte = record[recordPointer];
+			byte firstByte = record[recordStart + recordPointer];
 			if((firstByte & 0x80) > 0)
 			{
-				NumberOfColumns = BitConverter.ToInt16(record, 1);
+				NumberOfColumns = LittleEndian.ReadInt16(record, recordStart + 1);
 				recordPointer += 2;
 			}
 			else
-				NumberOfColumns = record[recordPointer++];
+				NumberOfColumns = record[recordStart + recordPointer++];
 
 			// Next up we have 4 bits per column in the record. Loop all columns, alternating between reading
 			// the first 4 bits, then the last 4 bits.
 			columnValueIndicators = new CompressedRecordColumnCDIndicator[NumberOfColumns];
 			for(int i=0; i<NumberOfColumns; i++)
-				columnValueIndicators[i] = (CompressedRecordColumnCDIndicator)(i % 2 == 0 ? record[recordPointer] & 0xF : ((record[recordPointer++] & 0xF0) >> 4));
+				columnValueIndicators[i] = (CompressedRecordColumnCDIndicator)(i % 2 == 0 ? record[recordStart + recordPointer] & 0xF : ((record[recordStart + recordPointer++] & 0xF0) >> 4));
 
 			// Make sure to increase recordPointer if we end up reading the first 4 bits as the last
 			// column, and thus need to pad up to nearest byte.
@@ -221,14 +227,18 @@ namespace OrcaSql.Core.Engine.Records.Compression
 				// Read the length of each cluster
 				short[] clusterLengths = new short[numClusters];
 				for (int i = 0; i < numClusters; i++)
-					clusterLengths[i] = record[recordPointer++];
+					clusterLengths[i] = record[recordStart + recordPointer++];
 
 				// The first cluster always starts right after the cluster length array
 				shortDataRegionClusterPointers[0] = recordPointer;
 
 				// Each consecutive cluster starts after the sum length of all previous clusters
+				short cumulativeLength = 0;
 				for (int i = 1; i < numClusters; i++)
-					shortDataRegionClusterPointers[i] = (short)(shortDataRegionClusterPointers[0] + clusterLengths.Take(i).Sum(x => x));
+				{
+					cumulativeLength += clusterLengths[i - 1];
+					shortDataRegionClusterPointers[i] = (short)(shortDataRegionClusterPointers[0] + cumulativeLength);
+				}
 
 				// Once all the cluster lengths have been read, forward the record pointer to the end of the data
 				recordPointer = (short)(shortDataRegionClusterPointers[numClusters - 1] + clusterLengths[numClusters - 1]);
@@ -241,12 +251,12 @@ namespace OrcaSql.Core.Engine.Records.Compression
 				return;
 
 			// Read header
-			bool containsTwoByteOffsets = Convert.ToBoolean(record[recordPointer] & 0x1);
-			bool containsComplexColumns = Convert.ToBoolean(record[recordPointer] & 0x2);
+			bool containsTwoByteOffsets = Convert.ToBoolean(record[recordStart + recordPointer] & 0x1);
+			bool containsComplexColumns = Convert.ToBoolean(record[recordStart + recordPointer] & 0x2);
 			recordPointer++;
 
 			// Read number of entries
-			short numEntries = BitConverter.ToInt16(record, recordPointer);
+			short numEntries = LittleEndian.ReadInt16(record, recordStart + recordPointer);
 			longDataColumnPointers = new short[numEntries];
 			longDataColumnLengths = new short[numEntries];
 			recordPointer += 2;
@@ -255,7 +265,7 @@ namespace OrcaSql.Core.Engine.Records.Compression
 			short[] offsetEntries = new short[numEntries];
 			for (int i=0; i<numEntries; i++)
 			{
-				offsetEntries[i] = BitConverter.ToInt16(record, recordPointer);
+				offsetEntries[i] = LittleEndian.ReadInt16(record, recordStart + recordPointer);
 				recordPointer += 2;
 			}
 
@@ -274,6 +284,17 @@ namespace OrcaSql.Core.Engine.Records.Compression
 
 				recordPointer += longDataColumnLengths[i];
 			}
+		}
+
+		private static byte[] CopyBytes(byte[] source, int offset, int length)
+		{
+			if (length <= 0 || offset >= source.Length)
+				return Array.Empty<byte>();
+
+			var available = Math.Min(length, source.Length - offset);
+			var result = new byte[available];
+			Buffer.BlockCopy(source, offset, result, 0, available);
+			return result;
 		}
 	}
 }

@@ -25,6 +25,15 @@ namespace OrcaSql.Core.Engine.SqlTypes
             return DateTime.MinValue.AddDays(date);
         }
 
+        public override object GetValue(ReadOnlySpan<byte> value)
+        {
+            if (value.Length != 3)
+                throw new ArgumentException("Invalid value length: " + value.Length);
+
+            var date = value[0] + (value[1] << 8) + (value[2] << 16);
+            return DateTime.MinValue.AddDays(date);
+        }
+
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)
         {
             return DateTime.TryParse(columnConstraint.Definition.Trim('(', ')'), out var parsedResult) ? parsedResult : (object)null;

@@ -1,5 +1,4 @@
 using OrcaSql.Core.Engine.Records;
-using OrcaSql.Framework;
 
 namespace OrcaSql.Core.Engine.Pages
 {
@@ -25,7 +24,7 @@ namespace OrcaSql.Core.Engine.Pages
             //                     select new { o1.i,o1.o, length = p?.o - o1.o };
             var idx = 0;
 			foreach (var recordOffset in SlotArray)
-				Records[idx++] = new IndexRecord(ArrayHelper.SliceArray(RawBytes, recordOffset,  RawBytes.Length - recordOffset ), this);
-		}
+				Records[idx++] = new IndexRecord(RawBytes, recordOffset, RawBytes.Length - recordOffset, this);
+	}
 	}
 }

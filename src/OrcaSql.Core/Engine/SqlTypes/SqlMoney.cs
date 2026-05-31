@@ -39,6 +39,22 @@ namespace OrcaSql.Core.Engine.SqlTypes
 			}
 		}
 
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			if (CompressionContext.CompressionLevel != CompressionLevel.None)
+			{
+				if (value.Length > 8)
+					throw new ArgumentException("Invalid value length: " + value.Length);
+
+				return SqlSpanBitConverter.ToInt64FromBigEndian(value, Offset.MinValue) / 10000m;
+			}
+
+			if (value.Length != FixedLength.Value)
+				throw new ArgumentException("Invalid value length: " + value.Length);
+
+			return LittleEndian.ReadInt64(value) / 10000m;
+		}
+
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)
         {
             return long.TryParse(columnConstraint.Definition.Trim('(', ')'), out var parsedResult) ? parsedResult : (object)null;

@@ -28,6 +28,14 @@ namespace OrcaSql.Core.Engine.SqlTypes
 			return new Guid(value);
 		}
 
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			if (value.Length != 16)
+				throw new ArgumentException("Invalid value length: " + value.Length);
+
+			return new Guid(value.ToArray());
+		}
+
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)
         {
             return Guid.TryParse(columnConstraint.Definition.Trim('(', ')'), out var parsedResult) ? parsedResult : (object)null;

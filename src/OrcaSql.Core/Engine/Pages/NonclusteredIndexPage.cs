@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OrcaSql.Core.Engine.Records;
+using OrcaSql.Core.Engine.Records.VariableLengthDataProxies;
 using OrcaSql.Core.Engine.SqlTypes;
 using OrcaSql.Core.MetaData;
 
@@ -46,9 +47,9 @@ namespace OrcaSql.Core.Engine.Pages
 						{
 							// If a nullable varlength column does not have a value, it may be not even appear in the varlength column array if it's at the tail
 							if (record.VariableLengthColumnData.Length <= variableColumnIndex)
-								columnValue = sqlType.GetValue(new byte[] { });
+								columnValue = sqlType.GetValue(System.Array.Empty<byte>());
 							else
-								columnValue = sqlType.GetValue(record.VariableLengthColumnData[variableColumnIndex].GetBytes());
+								columnValue = GetVariableLengthValue(sqlType, record.VariableLengthColumnData[variableColumnIndex]);
 						}
 
 						variableColumnIndex++;
@@ -59,7 +60,7 @@ namespace OrcaSql.Core.Engine.Pages
 						short fixedLength = sqlType.FixedLength.Value;
 
 						if (!record.HasNullBitmap || !record.IsNull(columnIndex))
-							columnValue = sqlType.GetValue(record.FixedLengthData.Skip(fixedOffset).Take(fixedLength).ToArray());
+							columnValue = sqlType.GetValue(new System.ReadOnlySpan<byte>(record.FixedLengthData, fixedOffset, fixedLength));
 
 						fixedOffset += fixedLength;
 					}
@@ -69,6 +70,14 @@ namespace OrcaSql.Core.Engine.Pages
 
 				yield return dataRow;
 			}
+		}
+
+		private static object GetVariableLengthValue(ISqlType sqlType, IVariableLengthDataProxy proxy)
+		{
+			var raw = proxy as RawByteProxy;
+			return raw != null
+				? sqlType.GetValue(new System.ReadOnlySpan<byte>(raw.Source, raw.Offset, raw.Length))
+				: sqlType.GetValue(proxy.GetBytes());
 		}
 	}
 }

@@ -30,6 +30,16 @@ namespace OrcaSql.Core.Engine.SqlTypes
 			return new DateTime(1900, 1, 1, time / 60, time % 60, 0).AddDays(date);
 		}
 
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			if (value.Length != 4)
+				throw new ArgumentException("Invalid value length: " + value.Length);
+
+			var time = (ushort)(value[0] | (value[1] << 8));
+			var date = (ushort)(value[2] | (value[3] << 8));
+			return new DateTime(1900, 1, 1, time / 60, time % 60, 0).AddDays(date);
+		}
+
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)
         {
             return DateTime.TryParse(columnConstraint.Definition.Trim('(', ')'), out var parsedResult) ? parsedResult : (object)null;

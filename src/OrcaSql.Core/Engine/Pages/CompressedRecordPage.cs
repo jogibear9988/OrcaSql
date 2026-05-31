@@ -1,6 +1,4 @@
-﻿using System.Linq;
 using OrcaSql.Core.Engine.Records.Compression;
-using OrcaSql.Framework;
 
 namespace OrcaSql.Core.Engine.Pages
 {
@@ -24,7 +22,7 @@ namespace OrcaSql.Core.Engine.Pages
 
 			int cnt = 0;
 			foreach (short recordOffset in SlotArray)
-				Records[cnt++] = new CompressedRecord(ArrayHelper.SliceArray(RawBytes, recordOffset, RawBytes.Length - recordOffset), this);
+				Records[cnt++] = new CompressedRecord(RawBytes, recordOffset, RawBytes.Length - recordOffset, this);
 		}
 	}
 }

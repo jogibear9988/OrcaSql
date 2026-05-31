@@ -41,6 +41,22 @@ namespace OrcaSql.Core.Engine.SqlTypes
 			}
 		}
 
+		public override object GetValue(ReadOnlySpan<byte> value)
+		{
+			if (CompressionContext.CompressionLevel != CompressionLevel.None)
+			{
+				if (value.Length > 1)
+					throw new ArgumentException("Invalid value length: " + value.Length);
+
+				return value.Length == 0 ? 0 : value[0];
+			}
+
+			if (value.Length != 1)
+				throw new ArgumentException("Invalid value length: " + value.Length);
+
+			return value[0];
+		}
+
         public override object GetDefaultValue(SysDefaultConstraint columnConstraint)
         {
             return byte.TryParse(columnConstraint.Definition.Trim('(', ')'), out var parsedResult) ? parsedResult : (object)null;
