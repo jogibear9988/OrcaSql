@@ -18,6 +18,25 @@ namespace OrcaSql.Core.Engine.Pages
 			Database = database;
 			RawBytes = bytes;
 			Header = new PageHeader(RawBytes, 0);
+			RestoreTornPageBits();
+		}
+
+		private void RestoreTornPageBits()
+		{
+			// With TORN_PAGE_DETECTION SQL Server stores the original low two
+			// bits of each 512-byte sector's final byte in the page header, then
+			// replaces those bits on disk with an alternating write signature.
+			// Restore the displaced bits before record and slot parsing.
+			if ((Header.FlagBits & 0x100) == 0)
+				return;
+
+			var tornBits = LittleEndian.ReadUInt32(RawBytes, 60);
+			for (var sector = 1; sector < 16; sector++)
+			{
+				var byteOffset = sector * 512 + 511;
+				var originalBits = (byte)(tornBits >> (sector * 2) & 0x03);
+				RawBytes[byteOffset] = (byte)(RawBytes[byteOffset] & 0xfc | originalBits);
+			}
 		}
 
 		public byte[] RawHeader
